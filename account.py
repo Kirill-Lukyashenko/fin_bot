@@ -5,7 +5,7 @@ class Account:
     def __init__(self,
                  object_number : int,
                  source : str,
-                 type : str,
+                 acc_type : str,
                  product_name : str | None,
                  requisites : str | None,
                  balance : str | Decimal,
@@ -15,7 +15,7 @@ class Account:
                  ):
         self.object_number = object_number                                          # Порядковый номер места хранения денег
         self.source = source                                                        # Место хранения денег
-        self.type = type                                                            # Тип места хранения
+        self.acc_type = acc_type                                                    # Тип места хранения
         self.product_name = product_name                                            # Название продукта где хранятся деньги
         self.requisites = requisites                                                # Реквизиты карты/счёта
         self.balance = balance                                                      # Актуальный баланс
