@@ -39,7 +39,7 @@ class Transaction:
 
         # Проверка правильности операции
         if not isinstance(self.operation, OperationType):
-            raise ValueError("Неверная операция")
+            raise TypeError("Неверная операция")
 
     def check_state(self) -> str:
         """Проверка состояния транзакции"""
