@@ -31,7 +31,7 @@ class Account:
 
     def check_state(self):
         if self.is_active:
-            print("Запрашиваемый счёт активен")
+            return "Запрашиваемый счёт активен"
         else:
-            print("Запрашиваемый счёт деактивирован")
+            return "Запрашиваемый счёт деактивирован"
 
