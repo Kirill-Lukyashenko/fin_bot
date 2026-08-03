@@ -18,9 +18,9 @@ class Account:
         self.acc_type = acc_type                                                    # Тип места хранения
         self.product_name = product_name                                            # Название продукта где хранятся деньги
         self.requisites = requisites                                                # Реквизиты карты/счёта
-        self.balance = balance                                                      # Актуальный баланс
+        self.balance = Decimal(balance)                                             # Актуальный баланс
         self.currency = currency                                                    # Валюта хранения
-        self.limit = limit                                                          # Лимит (используется только для кредиток)
+        self.limit = Decimal(limit) if limit is not None else None                  # Лимит (используется только для кредиток)
         self.is_active = is_active                                                  # Активен ли счёт в данный момент
 
     def acc_activate(self):
