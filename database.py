@@ -38,3 +38,27 @@ def create_tables() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transactions (
+            
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                action_date TEXT NOT NULL,
+                amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+
+                operation TEXT NOT NULL CHECK (operation IN ('Доход', 'Расход')),
+
+                category TEXT NOT NULL,
+                account_id INTEGER NOT NULL,
+                comment TEXT NOT NULL,
+
+                is_active INTEGER NOT  NULL DEFAULT 1 CHECK (is_active IN(0,1)),
+
+                FOREIGN KEY (account_id)
+                    REFERENCES accounts(id)
+                    ON DELETE RESTRICT
+            
+            )
+            """
+        )
