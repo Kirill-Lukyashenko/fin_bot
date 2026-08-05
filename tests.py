@@ -1,8 +1,17 @@
-from account import Account
-from transaction import Transaction, OperationType
-from datetime import date
+from decimal import Decimal
 
-kaspi = Account(1,"Kaspi","Карта","Kaspi gold", "4084","0.0","KZT", None)
+from money import from_minor_units, to_minor_units
 
-income = Transaction(date(2026,8,4),"5000.00",OperationType.INCOME, "Зарплата", kaspi, "Получил зпшку")
-expense = Transaction(date(2026,8,4),"2000.00",OperationType.EXPENSE, "Продукты", kaspi, "Закупился в магазине")
+
+amount = Decimal("6032.53")
+
+amount_minor = to_minor_units(amount)
+restored_amount = from_minor_units(amount_minor)
+
+print(amount_minor)
+print(restored_amount)
+
+assert amount_minor == 603253
+assert restored_amount == Decimal("6032.53")
+
+print("Функции преобразования денег работают правильно")
