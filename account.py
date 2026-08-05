@@ -3,7 +3,7 @@ from decimal import Decimal
 class Account:
 
     def __init__(self,
-                 object_number : int,
+                 object_number : int | None,
                  source : str,
                  acc_type : str,
                  product_name : str | None,
