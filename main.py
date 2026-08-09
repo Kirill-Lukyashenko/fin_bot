@@ -6,25 +6,22 @@ from database import create_tables
 def main() -> None:
     create_tables()
 
-    kaspi_gold = Account(
-        object_number=None,
-        source="Kaspi",
-        acc_type="Карта",
-        product_name="Gold",
-        requisites="4084",
-        balance="1000.00",
-        currency="KZT",
-        limit=None,
-        is_active=True,
-    )
-
     repository = AccountRepository()
 
-    account_id = repository.add_account(kaspi_gold)
+    accounts = repository.get_active_accounts()
 
-    print(f"Счёт сохранён с идентификатором: {account_id}")
-    print(f"Идентификатор внутри объекта: {kaspi_gold.object_number}")
+    print(f"Количество счетов: {len(accounts)}")
 
+    for account in accounts:
+        print(
+            account.object_number,
+            account.source,
+            account.product_name,
+            account.balance,
+            account.currency,
+            account.is_active
+            )
 
+    
 if __name__ == "__main__":
     main()

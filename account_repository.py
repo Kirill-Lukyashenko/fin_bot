@@ -1,6 +1,6 @@
 from account import Account
 from database import get_connection
-from money import to_minor_units
+from money import to_minor_units, from_minor_units
 
 class AccountRepository:
     """Описание работы с таблицей accounts"""
@@ -65,8 +65,155 @@ class AccountRepository:
         finally:
             connection.close()
 
-    def gt_account_by_id(self):
+    def get_account_by_id(self, account_id : int) -> Account | None:
         """Восстанавливает объект Account по прочитаной строке SQL"""
 
-        
-        pass
+        if type(account_id) is not int:
+            raise TypeError("Идентификатор счёта должен быть целочисленного типа")
+
+        if account_id <= 0:
+            raise ValueError("Идентификатор счёта должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+            row = connection.execute(
+                """
+                SELECT
+                    id,
+                    source,
+                    acc_type,
+                    product_name,
+                    requisites,
+                    currency,
+                    balance_minor,
+                    limit_minor,
+                    is_active
+                FROM accounts
+                WHERE id = ?
+                """,
+                (account_id,),
+            ).fetchone()
+
+        finally:
+
+            connection.close()
+
+        if row is None:
+            return None
+
+        return Account(
+            object_number = row["id"],
+            source = row["source"],
+            acc_type = row["acc_type"],
+            product_name = row["product_name"],
+            requisites = row["requisites"],
+            balance = from_minor_units(row["balance_minor"]),
+            currency = row["currency"],
+            limit = (from_minor_units(row["limit_minor"]) 
+                     if row["limit_minor"] is not None 
+                     else None
+            ),
+            is_active = bool(row["is_active"])
+        )
+
+    def get_all_accounts(self) -> list[Account]:
+        """Возвращает список всех аккаунтов добавленных в базу"""
+
+        connection = get_connection()
+
+        try:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    source,
+                    acc_type,
+                    product_name,
+                    requisites,
+                    currency,
+                    balance_minor,
+                    limit_minor,
+                    is_active
+                FROM accounts
+                ORDER BY id
+                """
+            ).fetchall()
+
+        finally:
+            connection.close()
+
+        accounts = []
+
+        for row in rows:
+
+            account = Account(
+            object_number = row["id"],
+            source = row["source"],
+            acc_type = row["acc_type"],
+            product_name = row["product_name"],
+            requisites = row["requisites"],
+            balance = from_minor_units(row["balance_minor"]),
+            currency = row["currency"],
+            limit = (from_minor_units(row["limit_minor"]) 
+                     if row["limit_minor"] is not None 
+                     else None
+            ),
+            is_active = bool(row["is_active"])
+            )
+
+            accounts.append(account)
+
+        return accounts
+
+    def get_active_accounts(self) -> list[Account]:
+        """Возвращает список всех активных аккаунтов добавленных в базу"""
+
+        connection = get_connection()
+
+        try:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    source,
+                    acc_type,
+                    product_name,
+                    requisites,
+                    currency,
+                    balance_minor,
+                    limit_minor,
+                    is_active
+                FROM accounts
+                WHERE is_active = 1
+                ORDER BY id
+                """
+            ).fetchall()
+
+        finally:
+            connection.close()
+
+        accounts = []
+
+        for row in rows:
+
+            account = Account(
+            object_number = row["id"],
+            source = row["source"],
+            acc_type = row["acc_type"],
+            product_name = row["product_name"],
+            requisites = row["requisites"],
+            balance = from_minor_units(row["balance_minor"]),
+            currency = row["currency"],
+            limit = (from_minor_units(row["limit_minor"]) 
+                     if row["limit_minor"] is not None 
+                     else None
+            ),
+            is_active = bool(row["is_active"])
+            )
+
+            accounts.append(account)
+
+        return accounts
+
+
