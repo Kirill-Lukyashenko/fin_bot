@@ -1,6 +1,7 @@
 from account import Account
 from account_repository import AccountRepository
 from database import create_tables
+from decimal import Decimal
 
 
 def main() -> None:

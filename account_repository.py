@@ -216,4 +216,99 @@ class AccountRepository:
 
         return accounts
 
+    def delete_account_by_id(self, account_id : int) -> None:
+        """
+        Функция удаляет случайные или неправильные записи из таблицы
+        Применяется только для случайных записей без финансовой истории
+        """
 
+        if type(account_id) is not int:
+            raise TypeError("Идентификатор счёта должен быть целочисленного типа")
+
+        if account_id <= 0:
+            raise ValueError("Идентификатор счёта должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                    """
+                    DELETE FROM accounts
+                    WHERE id = ?
+                    """,
+                    (account_id,)
+                )
+
+            if cursor.rowcount == 0:
+
+                raise ValueError("Записи с таким идентификатором не существует")
+        
+            connection.commit()
+
+        except Exception:
+
+            connection.rollback()
+            raise
+
+        finally:
+
+            connection.close()
+
+    def update_account(self, account : Account) -> None:
+        """Функция обнавляет данные существующей записи в таблице"""
+
+        if not isinstance(account, Account):
+            raise TypeError("Должен быть передан объект акаунт")
+
+        if account.object_number is None:
+            raise ValueError("Нельзя обновить счёт без идентификатора")
+
+        balance_minor = to_minor_units(account.balance)
+
+        limit_minor = (
+            to_minor_units(account.limit)
+            if account.limit is not None
+            else None
+                       )
+
+        connection = get_connection()
+
+        try:
+            cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET
+                    source = ?,
+                    acc_type = ?,
+                    product_name = ?,
+                    requisites = ?,
+                    currency = ?,
+                    balance_minor =?,
+                    limit_minor = ?,
+                    is_active = ?
+                WHERE id = ?
+                """,
+                (
+                    account.source,
+                    account.acc_type,
+                    account.product_name,
+                    account.requisites,
+                    account.currency,
+                    balance_minor,
+                    limit_minor,
+                    int(account.is_active),
+                    account.object_number,
+                 )
+            )
+
+            if cursor.rowcount == 0:
+                raise ValueError("Записи с таким идентификатором не существует")
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
