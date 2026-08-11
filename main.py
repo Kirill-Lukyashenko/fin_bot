@@ -1,28 +1,23 @@
 from account import Account
+from transaction import Transaction
+from transaction_repository import TransactionRepository
 from account_repository import AccountRepository
 from database import create_tables
 from decimal import Decimal
+from datetime import date
+from transaction import OperationType
 
 
 def main() -> None:
     create_tables()
 
     repository = AccountRepository()
+    tr_rep = TransactionRepository()
 
-    accounts = repository.get_active_accounts()
+    account = repository.get_account_by_id(2)
 
-    print(f"Количество счетов: {len(accounts)}")
-
-    for account in accounts:
-        print(
-            account.object_number,
-            account.source,
-            account.product_name,
-            account.balance,
-            account.currency,
-            account.is_active
-            )
-
+    tr_rep.delete_transaction_by_id(1)
+    
     
 if __name__ == "__main__":
     main()
