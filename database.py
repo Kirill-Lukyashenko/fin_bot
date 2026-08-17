@@ -62,3 +62,11 @@ def create_tables() -> None:
             )
             """
         )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_transactions_action_date_id
+            ON transactions(action_date,id)
+            """
+        )
