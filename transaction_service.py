@@ -102,3 +102,186 @@ class TransactionService:
             transaction.account.balance -= transaction.amount
             
         return transaction.transaction_id
+    
+    def cancel_transaction(self, transaction_id: int) -> None:
+        """Функция отменяет транзакцию"""
+
+        if type(transaction_id) is not int:
+            raise TypeError("Идентификатор транзакции должен быть целочисленным")
+
+        if transaction_id <= 0:
+            raise ValueError("Идентификатор транзакции должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+            row = connection.execute(
+                """
+                SELECT
+                    account_id,
+                    operation,
+                    amount_minor,
+                    is_active
+                FROM transactions
+                WHERE id = ?
+                """,
+                (
+                    transaction_id,
+                )
+            ).fetchone()
+
+            if row is None:
+                raise ValueError("Транзакции с таким идентификатором не существует")
+
+            if not bool(row["is_active"]):
+                raise ValueError("Транзакция уже отменена")
+
+            operation = OperationType(row["operation"])
+
+            transaction_cursor = connection.execute(
+                            """
+                            UPDATE transactions
+                            SET is_active = 0
+                            WHERE id = ?
+                            AND is_active = 1
+                            """,
+                            (
+                                transaction_id,
+                            )
+            )
+
+            if transaction_cursor.rowcount == 0:
+                raise ValueError("Транзакция уже отменена")
+
+            if operation == OperationType.EXPENSE:
+                account_cursor = connection.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_minor = balance_minor + ?
+                    WHERE id = ?
+                    """,
+                    (
+                        row["amount_minor"],
+                        row["account_id"],
+                    )
+                )
+
+            elif operation == OperationType.INCOME:
+                account_cursor = connection.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_minor = balance_minor - ?
+                    WHERE id = ?
+                    """,
+                    (
+                        row["amount_minor"],
+                        row["account_id"],
+                    )
+                )
+
+            else:
+                raise ValueError("Неизвестный тип финансововой операции")
+
+            if account_cursor.rowcount == 0:
+                raise ValueError("Счёта с таким идентификатором не найдено в базе")
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
+
+    def restore_transaction(self, transaction_id: int) -> None:
+        """Функция восстанавливает деактивированную транзакцию"""
+
+        if type(transaction_id) is not int:
+            raise TypeError("Идентификатор транзакции должен быть целочисленным")
+
+        if transaction_id <= 0:
+            raise ValueError("Идентификатор транзакции должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+
+            row = connection.execute(
+                """
+                SELECT
+                    account_id,
+                    operation,
+                    amount_minor,
+                    is_active
+                FROM transactions
+                WHERE id = ?
+                """,
+                (
+                    transaction_id,
+                )
+            ).fetchone()
+
+            if row is None:
+                raise ValueError("Транзакции с таким идентификатором не существует")
+
+            if bool(row["is_active"]):
+                raise ValueError("Транзакция уже восстановлена")
+
+            operation = OperationType(row["operation"])
+
+            transaction_cursor = connection.execute(
+                """
+                UPDATE transactions
+                SET is_active = 1
+                WHERE id = ?
+                AND is_active = 0
+                """,
+                (
+                    transaction_id,
+                )
+            )
+
+            if transaction_cursor.rowcount == 0:
+                raise ValueError("Транзакция уже восстановлена")
+
+            if operation == OperationType.INCOME:
+                account_cursor = connection.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_minor = balance_minor + ?
+                    WHERE id = ?
+                    """,
+                    (
+                        row["amount_minor"],
+                        row["account_id"],
+                    )
+                )
+
+            elif operation == OperationType.EXPENSE:
+                account_cursor = connection.execute(
+                    """
+                    UPDATE accounts
+                    SET balance_minor = balance_minor - ?
+                    WHERE id = ?
+                    """,
+                    (
+                        row["amount_minor"],
+                        row["account_id"],
+                    )
+                )
+
+            else:
+                raise ValueError("Неизвестный тип финансовой операции")
+
+            if account_cursor.rowcount == 0:
+                raise ValueError("Счёта с таким идентификатором не найдено в базе")
+            
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
