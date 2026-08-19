@@ -285,6 +285,3 @@ class TransactionService:
 
         finally:
             connection.close()
-
-    def execute_transfer(self):
-        pass
