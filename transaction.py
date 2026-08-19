@@ -7,6 +7,8 @@ class OperationType(str, Enum):
     """Перечисление типов доступных операций"""
     INCOME = "Доход"
     EXPENSE = "Расход"
+    TRANSFER_IN = "Перевод входящий"
+    TRANSFER_OUT = "Перевод исходяший"
 
 class Transaction:
 

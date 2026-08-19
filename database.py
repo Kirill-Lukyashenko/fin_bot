@@ -31,13 +31,22 @@ def create_tables() -> None:
                 requisites TEXT,
                 currency TEXT NOT NULL,
                 
-                balance_minor INTEGER NOT NULL DEFAULT 1,
+                balance_minor INTEGER NOT NULL DEFAULT 0,
                 limit_minor INTEGER,
 
-                is_active INTEGER
+                is_active INTEGER NOT  NULL DEFAULT 1 CHECK (is_active IN(0,1))
             )
             """
         )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transfers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT
+            )
+            """
+        )
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS transactions (
@@ -47,7 +56,17 @@ def create_tables() -> None:
                 action_date TEXT NOT NULL,
                 amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
 
-                operation TEXT NOT NULL CHECK (operation IN ('Доход', 'Расход')),
+                operation TEXT NOT NULL CHECK (
+                    (
+                        operation IN ('Доход', 'Расход') 
+                        AND transfer_id is NULL
+                    ) 
+                    OR 
+                    (
+                        operation IN ('Перевод входящий','Перевод исходящий') 
+                        AND transfer_id IS NOT NULL
+                    )
+                ),
 
                 category TEXT NOT NULL,
                 account_id INTEGER NOT NULL,
@@ -55,10 +74,15 @@ def create_tables() -> None:
 
                 is_active INTEGER NOT  NULL DEFAULT 1 CHECK (is_active IN(0,1)),
 
+                transfer_id INTEGER,
+
                 FOREIGN KEY (account_id)
                     REFERENCES accounts(id)
+                    ON DELETE RESTRICT,
+
+                FOREIGN KEY (transfer_id)
+                    REFERENCES transfers(id)
                     ON DELETE RESTRICT
-            
             )
             """
         )
