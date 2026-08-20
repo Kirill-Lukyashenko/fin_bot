@@ -8,7 +8,7 @@ class OperationType(str, Enum):
     INCOME = "Доход"
     EXPENSE = "Расход"
     TRANSFER_IN = "Перевод входящий"
-    TRANSFER_OUT = "Перевод исходяший"
+    TRANSFER_OUT = "Перевод исходящий"
 
 class Transaction:
 

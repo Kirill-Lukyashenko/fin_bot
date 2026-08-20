@@ -21,11 +21,31 @@ class TransactionService:
         if not transaction.is_active:
             raise ValueError("Нельзя провести неактивную транзакцию")
 
+        if transaction.operation not in (OperationType.INCOME, OperationType.EXPENSE,):
+            raise ValueError("Через execute_transaction можно проводить только доход или расход")
+
         amount_minor = to_minor_units(transaction.amount)
 
         connection = get_connection()
 
         try:
+
+            account_row = connection.execute(
+                """
+                SELECT is_active
+                FROM accounts
+                WHERE id = ?
+                """,
+                (
+                    transaction.account.object_number,
+                )
+            ).fetchone()
+
+            if account_row is None:
+                raise ValueError("Счёт данной транзакции не найден")
+
+            if not bool(account_row["is_active"]):
+                raise ValueError("Нельзя провести транзакцию по неактивному счёту")
 
             cursor = connection.execute(
                 """
@@ -122,7 +142,8 @@ class TransactionService:
                     account_id,
                     operation,
                     amount_minor,
-                    is_active
+                    is_active,
+                    transfer_id
                 FROM transactions
                 WHERE id = ?
                 """,
@@ -133,6 +154,9 @@ class TransactionService:
 
             if row is None:
                 raise ValueError("Транзакции с таким идентификатором не существует")
+
+            if row["transfer_id"] is not None:
+                raise ValueError("Эта транзакция является частью перевода, Необходимо отменять весь перевод")
 
             if not bool(row["is_active"]):
                 raise ValueError("Транзакция уже отменена")
@@ -214,7 +238,8 @@ class TransactionService:
                     account_id,
                     operation,
                     amount_minor,
-                    is_active
+                    is_active,
+                    transfer_id
                 FROM transactions
                 WHERE id = ?
                 """,
@@ -226,6 +251,9 @@ class TransactionService:
             if row is None:
                 raise ValueError("Транзакции с таким идентификатором не существует")
 
+            if row["transfer_id"] is not None:
+                raise ValueError("Эта транзакция является частью перевода, Необходимо восстанавливать весь перевод")
+    
             if bool(row["is_active"]):
                 raise ValueError("Транзакция уже восстановлена")
 
@@ -354,7 +382,7 @@ class TransactionService:
                 VALUES (?)
                 """,
                 (
-                    int(transfer.is_active)
+                    int(transfer.is_active),
                 )
             )
 
@@ -450,7 +478,6 @@ class TransactionService:
 
         finally:
             connection.close()
-
 
         transfer.transfer_id = transfer_id
         
