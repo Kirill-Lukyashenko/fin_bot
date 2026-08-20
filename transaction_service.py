@@ -1,6 +1,7 @@
 from transaction import Transaction, OperationType
 from database import get_connection
 from money import to_minor_units
+from transfer import Transfer
 
 class TransactionService:
     """Логика поведения финансовых транзакций"""
@@ -285,3 +286,172 @@ class TransactionService:
 
         finally:
             connection.close()
+
+    def execute_transfer(self, transfer : Transfer) -> int:
+        """Функция выполняет перевод средств с одного счёта на другой"""
+
+        if not isinstance(transfer, Transfer):
+            raise TypeError("Должен быть передан объект трансфер")
+
+        if transfer.transfer_id is not None:
+            raise ValueError("Перевод уже имеет идентификатор")
+
+        if not transfer.is_active:
+            raise ValueError("Нельзя провести неактивный перевод")
+
+        amount_minor = to_minor_units(transfer.amount)
+
+        connection = get_connection()
+
+        try:
+            source_account= connection.execute(
+                """
+                SELECT
+                    currency,
+                    is_active
+                FROM accounts
+                WHERE
+                    id = ?
+                """,
+                (
+                    transfer.source_account_id,
+                )
+            ).fetchone()
+
+            dest_account = connection.execute(
+                """
+                SELECT
+                    currency,
+                    is_active
+                FROM accounts
+                WHERE
+                    id = ?
+                """,
+                (
+                    transfer.dest_account_id,
+                )
+            ).fetchone()
+
+            if source_account is None:
+                raise ValueError("Счёт отправителя не найден")
+
+            if dest_account is None:
+                raise ValueError("Счёт получателя не найден")
+
+            if not bool(source_account["is_active"]):
+                raise ValueError("Счёт отправителя не активен")
+
+            if not bool(dest_account["is_active"]):
+                raise ValueError("Счёт получателя неактивен")
+
+            if source_account["currency"] != dest_account["currency"]:
+                raise ValueError("Валютные переводы пока недоступны!")
+
+            transfer_cursor = connection.execute(
+                """
+                INSERT INTO transfers
+                    (is_active)
+                VALUES (?)
+                """,
+                (
+                    int(transfer.is_active)
+                )
+            )
+
+            transfer_id = transfer_cursor.lastrowid
+
+            connection.execute(
+                """
+                INSERT INTO transactions (
+                    action_date,
+                    amount_minor,
+                    operation,
+                    category,
+                    account_id,
+                    comment,
+                    is_active,
+                    transfer_id
+                )
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (
+                    transfer.action_date.isoformat(),
+                    amount_minor,
+                    OperationType.TRANSFER_OUT.value,
+                    transfer.CATEGORY,
+                    transfer.source_account_id,
+                    transfer.comment,
+                    int(transfer.is_active),
+                    transfer_id,
+                )
+            )
+
+            connection.execute(
+                """
+                INSERT INTO transactions (
+                    action_date,
+                    amount_minor,
+                    operation,
+                    category,
+                    account_id,
+                    comment,
+                    is_active,
+                    transfer_id
+                )
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (
+                    transfer.action_date.isoformat(),
+                    amount_minor,
+                    OperationType.TRANSFER_IN.value,
+                    transfer.CATEGORY,
+                    transfer.dest_account_id,
+                    transfer.comment,
+                    int(transfer.is_active),
+                    transfer_id,
+                )
+            )
+
+            source_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor - ?
+                WHERE id = ?
+                """,
+                (
+                    amount_minor,
+                    transfer.source_account_id
+                )
+            )
+
+            if source_cursor.rowcount == 0:
+                raise ValueError("Не удалось изменить баланс счёта отправителя")
+
+            dest_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor + ?
+                WHERE id = ?
+                """,
+                (
+                    amount_minor,
+                    transfer.dest_account_id
+                )
+            )
+
+            if dest_cursor.rowcount == 0:
+                raise ValueError("Не удалось изменить баланс счёта получателя")
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
+
+
+        transfer.transfer_id = transfer_id
+        
+        return transfer.transfer_id
