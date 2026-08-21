@@ -56,12 +56,13 @@ def main() -> None:
     acc_rep = AccountRepository()
     tr_service = TransactionService()
 
-    """account = acc_rep.get_account_by_id(2)
+    account = acc_rep.get_account_by_id(3)
 
+    """
     transaction = Transaction(
         action_date=date(2026, 8, 20),
-        amount=Decimal("800000.00"),
-        operation=OperationType.INCOME,
+        amount=Decimal("405000.00"),
+        operation=OperationType.EXPENSE,
         category="ЗАРПЛАТА",
         account=account,
         comment="Получил зарплату"
@@ -69,20 +70,21 @@ def main() -> None:
 
     tr_service.execute_transaction(transaction)
     """
+    #tr_service.cancel_transaction(7)
+    
 
     """
     transfer = Transfer(
         action_date=date(2026, 8, 21),
         source_account_id=2,
         dest_account_id=3,
-        amount=Decimal("500000.00"),
+        amount=Decimal("10000.00"),
         comment="Тестовый перевод с BCC на Фридом"
     )
 
     tr_service.execute_transfer(transfer)
     """
-
-    tr_service.restore_transfer(1)
+    #tr_service.cancel_transfer(3)
 
     """
     account = acc_rep.get_account_by_id(3)

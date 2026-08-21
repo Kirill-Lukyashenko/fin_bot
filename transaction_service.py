@@ -93,15 +93,17 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
+                    AND balance_minor >= ?
                     """,
                     (
                         amount_minor,
                         transaction.account.object_number,
+                        amount_minor,
                     )
                 )
 
             if amount_cursor.rowcount == 0:
-                raise ValueError("Счёт данной транзакции не найден")
+                raise ValueError("На счете недостаточно средств")
 
             transaction_id = cursor.lastrowid
 
@@ -197,10 +199,12 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
+                    AND balance_minor >= ?
                     """,
                     (
                         row["amount_minor"],
                         row["account_id"],
+                        row["amount_minor"],
                     )
                 )
 
@@ -208,7 +212,7 @@ class TransactionService:
                 raise ValueError("Неизвестный тип финансововой операции")
 
             if account_cursor.rowcount == 0:
-                raise ValueError("Счёта с таким идентификатором не найдено в базе")
+                raise ValueError("На счете недостаточно средств")
 
             connection.commit()
 
@@ -293,10 +297,12 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
+                    AND balance_minor >= ?
                     """,
                     (
                         row["amount_minor"],
                         row["account_id"],
+                        row["amount_minor"],
                     )
                 )
 
@@ -304,7 +310,7 @@ class TransactionService:
                 raise ValueError("Неизвестный тип финансовой операции")
 
             if account_cursor.rowcount == 0:
-                raise ValueError("Счёта с таким идентификатором не найдено в базе")
+                raise ValueError("На счете недостаточно средств")
             
             connection.commit()
 
@@ -445,15 +451,17 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
+                AND  balance_minor >= ?
                 """,
                 (
                     amount_minor,
-                    transfer.source_account_id
+                    transfer.source_account_id,
+                    amount_minor,
                 )
             )
 
             if source_cursor.rowcount == 0:
-                raise ValueError("Не удалось изменить баланс счёта отправителя")
+                raise ValueError("На счете недостаточно средств")
 
             dest_cursor = connection.execute(
                 """
@@ -611,15 +619,17 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
+                AND balance_minor >= ?
                 """,
                 (
                     transaction_in_transfer_row["amount_minor"],
                     dest_acc,
+                    transaction_in_transfer_row["amount_minor"],
                 )
             )
 
             if dest_acc_cursor.rowcount == 0:
-                raise ValueError("Аккаунт не найден в базе")
+                raise ValueError("На счете недостаточно средств")
 
             connection.commit()
 
@@ -744,15 +754,17 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
+                AND balance_minor >= ?
                 """,
                 (
                     transaction_out_transfer_row["amount_minor"],
                     source_acc,
+                    transaction_out_transfer_row["amount_minor"],
                 )
             )
 
             if source_acc_cursor.rowcount == 0:
-                raise ValueError("Аккаунт не найден в базе")
+                raise ValueError("На счете недостаточно средств")
 
             dest_acc_cursor = connection.execute(
                 """
