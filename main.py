@@ -70,16 +70,25 @@ def main() -> None:
     tr_service.execute_transaction(transaction)
     """
 
+    """
     transfer = Transfer(
-        action_date=date(2026, 8, 20),
+        action_date=date(2026, 8, 21),
         source_account_id=2,
         dest_account_id=3,
-        amount=Decimal("400000.00"),
+        amount=Decimal("500000.00"),
         comment="Тестовый перевод с BCC на Фридом"
     )
 
     tr_service.execute_transfer(transfer)
+    """
 
+    tr_service.restore_transfer(1)
+
+    """
+    account = acc_rep.get_account_by_id(3)
+    account.balance = Decimal("0.00")
+    acc_rep.update_account(account)
+    """
 
 if __name__ == "__main__":
     main()

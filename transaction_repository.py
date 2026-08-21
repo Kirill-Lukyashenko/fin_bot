@@ -148,7 +148,6 @@ class TransactionRepository:
         finally:
             connection.close()
 
-
     def get_transaction_by_id(self, transaction_id : int) -> Transaction:
         """Функция восстанавливает объект Transaction по идентификатору"""
 

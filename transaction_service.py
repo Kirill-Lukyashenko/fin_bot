@@ -482,3 +482,298 @@ class TransactionService:
         transfer.transfer_id = transfer_id
         
         return transfer.transfer_id
+
+    def cancel_transfer(self, transfer_id: int) -> None:
+        """Функция выполняет деактивацию перевода между счетами"""
+
+        if type(transfer_id) is not int:
+            raise TypeError("Идентификатор перевода должен быть целочисленным")
+
+        if transfer_id <= 0:
+            raise ValueError("Идентификатор перевода должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+            transfer_row = connection.execute(
+                """
+                SELECT
+                    is_active
+                FROM transfers
+                WHERE id = ?
+                """,
+                (
+                    transfer_id,
+                )
+            ).fetchone()
+
+            if transfer_row is None:
+                raise ValueError("Перевод не найден")
+
+            if not bool(transfer_row["is_active"]):
+                raise ValueError("Перевод уже деактивирован")
+
+            transaction_in_transfer_row = connection.execute(
+                """
+                SELECT
+                    amount_minor,
+                    is_active,
+                    account_id
+                FROM transactions
+                WHERE transfer_id = ?
+                AND operation = ?
+                """,
+                (
+                    transfer_id,
+                    OperationType.TRANSFER_IN.value,
+                )
+            ).fetchone()
+
+            if transaction_in_transfer_row is None:
+                raise ValueError("Транзакции с таким идентификатором не существует")
+
+            if not bool(transaction_in_transfer_row["is_active"]):
+                raise ValueError("Транзакция уже деактивирована")
+
+            dest_acc = int(transaction_in_transfer_row["account_id"])
+
+            transaction_out_transfer_row = connection.execute(
+                """
+                SELECT
+                    amount_minor,
+                    is_active,
+                    account_id
+                FROM transactions
+                WHERE transfer_id = ?
+                AND operation = ?
+                """,
+                (
+                    transfer_id,
+                    OperationType.TRANSFER_OUT.value,
+                )
+            ).fetchone()
+
+            if transaction_out_transfer_row is None:
+                raise ValueError("Транзакции с таким идентификатором не существует")
+
+            if not bool(transaction_out_transfer_row["is_active"]):
+                raise ValueError("Транзакция уже деактивирована")
+
+            source_acc = int(transaction_out_transfer_row["account_id"])
+
+            transfer_cursor = connection.execute(
+                """
+                UPDATE transfers
+                SET is_active = 0
+                WHERE id = ?
+                AND is_active = 1
+                """,
+                (
+                    transfer_id,
+                )
+            )
+
+            if transfer_cursor.rowcount == 0:
+                raise ValueError("Перевод не найден")
+
+            transaction_cursor = connection.execute(
+                """
+                UPDATE transactions
+                SET is_active = 0
+                WHERE transfer_id = ?
+                AND is_active = 1
+                """,
+                (
+                    transfer_id,
+                )
+            )
+
+            if transaction_cursor.rowcount != 2:
+                raise ValueError("Не удалось деактивировать обе транзакции перевода")
+
+            source_acc_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor + ?
+                WHERE id = ?
+                """,
+                (
+                    transaction_out_transfer_row["amount_minor"],
+                    source_acc,
+                )
+            )
+
+            if source_acc_cursor.rowcount == 0:
+                raise ValueError("Аккаунт не найден в базе")
+
+            dest_acc_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor - ?
+                WHERE id = ?
+                """,
+                (
+                    transaction_in_transfer_row["amount_minor"],
+                    dest_acc,
+                )
+            )
+
+            if dest_acc_cursor.rowcount == 0:
+                raise ValueError("Аккаунт не найден в базе")
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
+
+    def restore_transfer(self, transfer_id : int) -> None:
+        """Функция активирует перевод"""
+
+        if type(transfer_id) is not int:
+            raise TypeError("Идентификатор должен быть целочисленным")
+
+        if transfer_id <= 0 :
+            raise ValueError("Идентификатор должен быть больше нуля")
+
+        connection = get_connection()
+
+        try:
+
+            transfer_row = connection.execute(
+                """
+                SELECT
+                    is_active
+                FROM transfers
+                WHERE id = ?
+                """,
+                (
+                    transfer_id,
+                )
+            ).fetchone()
+
+            if transfer_row is None:
+                raise ValueError("Перевод с таким идентификатором не найден")
+
+            if bool(transfer_row["is_active"]):
+                raise ValueError("Перевод уже активен")
+
+            transaction_out_transfer_row = connection.execute(
+                """
+                SELECT
+                    amount_minor,
+                    is_active,
+                    account_id
+                FROM transactions
+                WHERE transfer_id =?
+                AND operation = ?
+                """,
+                (
+                    transfer_id,
+                    OperationType.TRANSFER_OUT.value,
+                )
+            ).fetchone()
+
+            if transaction_out_transfer_row is None:
+                raise ValueError("Транзакции с таким идентификатором перевода не существует")
+
+            if bool(transaction_out_transfer_row["is_active"]):
+                raise ValueError("Транзакция уже активна")
+
+            source_acc = int(transaction_out_transfer_row["account_id"])
+
+            transaction_in_transfer_row = connection.execute(
+                """
+                SELECT
+                    amount_minor,
+                    is_active,
+                    account_id
+                FROM transactions
+                WHERE transfer_id = ?
+                AND operation = ?
+                """,
+                (
+                    transfer_id,
+                    OperationType.TRANSFER_IN.value,
+                )
+            ).fetchone()
+
+            if transaction_in_transfer_row is None:
+                raise ValueError("Транзакции с таким идентификатором перевода не существует")
+
+            if bool(transaction_in_transfer_row["is_active"]):
+                raise ValueError("Транзакция уже активна")
+
+            dest_acc = int(transaction_in_transfer_row["account_id"])
+
+            transfer_cursor = connection.execute(
+                """
+                UPDATE transfers
+                SET is_active = 1
+                WHERE id = ?
+                AND is_active = 0
+                """,
+                (
+                    transfer_id,
+                )
+            )
+
+            if transfer_cursor.rowcount == 0:
+                raise ValueError("Перевод с таким идентификатором не найден")
+
+            transaction_cursor = connection.execute(
+                """
+                UPDATE transactions
+                SET is_active = 1
+                WHERE transfer_id = ?
+                AND is_active = 0
+                """,
+                (
+                    transfer_id,
+                )
+            )
+
+            if transaction_cursor.rowcount != 2:
+                raise ValueError("Не удалось активировать обе транзакции перевода")
+
+            source_acc_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor - ?
+                WHERE id = ?
+                """,
+                (
+                    transaction_out_transfer_row["amount_minor"],
+                    source_acc,
+                )
+            )
+
+            if source_acc_cursor.rowcount == 0:
+                raise ValueError("Аккаунт не найден в базе")
+
+            dest_acc_cursor = connection.execute(
+                """
+                UPDATE accounts
+                SET balance_minor = balance_minor + ?
+                WHERE id = ?
+                """,
+                (
+                    transaction_in_transfer_row["amount_minor"],
+                    dest_acc,
+                )
+            )
+
+            if dest_acc_cursor.rowcount == 0:
+                raise ValueError("Аккаунт не найден в базе")
+
+            connection.commit()
+
+        except Exception:
+            connection.rollback()
+            raise
+
+        finally:
+            connection.close()
