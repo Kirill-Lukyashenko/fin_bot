@@ -11,7 +11,7 @@ from transfer import Transfer
 
 
 def main() -> None:
-    """
+    
     create_tables()
 
     check_work = "yes"
@@ -51,12 +51,12 @@ def main() -> None:
         acc = AccountRepository()
 
         acc.add_account(account)
-        """
+        
 
-    acc_rep = AccountRepository()
-    tr_service = TransactionService()
+    #acc_rep = AccountRepository()
+    #tr_service = TransactionService()
 
-    account = acc_rep.get_account_by_id(3)
+    #account = acc_rep.get_account_by_id(3)
 
     """
     transaction = Transaction(

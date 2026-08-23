@@ -35,9 +35,10 @@ class TransactionRepository:
                     category,
                     account_id,
                     comment,
+                    transfer_id,
                     is_active
                 )
-                VALUES (?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?)
                 """,
                 (transaction.action_date.isoformat(),
                 amount_minor,
@@ -45,6 +46,7 @@ class TransactionRepository:
                 transaction.category,
                 transaction.account.object_number,
                 transaction.comment,
+                transaction.transfer_id,
                 int(transaction.is_active))
             )
 
@@ -122,6 +124,7 @@ class TransactionRepository:
                     category = ?,
                     account_id = ?,
                     comment = ?,
+                    transfer_id = ?,
                     is_active = ?
                 WHERE id = ?
                 """,
@@ -132,6 +135,7 @@ class TransactionRepository:
                     transaction.category,
                     transaction.account.object_number,
                     transaction.comment,
+                    transaction.transfer_id,
                     int(transaction.is_active),
                     transaction.transaction_id
                 )
@@ -171,6 +175,7 @@ class TransactionRepository:
                     category,
                     account_id,
                     comment,
+                    transfer_id,
                     is_active
                 FROM transactions
                 WHERE id = ?
@@ -202,6 +207,7 @@ class TransactionRepository:
                 account= account,
                 comment= transaction_row["comment"],
                 transaction_id= transaction_row["id"],
+                transfer_id= transaction_row["transfer_id"],
                 is_active= bool(transaction_row["is_active"])
             )
 
@@ -242,6 +248,7 @@ class TransactionRepository:
                     t.operation AS transaction_operation,
                     t.category AS transaction_category,
                     t.comment AS transaction_comment,
+                    t.transfer_id AS transaction_transfer_id,
                     t.is_active AS transaction_is_active,
 
                     a.id AS account_id,
@@ -305,6 +312,7 @@ class TransactionRepository:
                 account= account,
                 comment= row["transaction_comment"],
                 transaction_id= row["transaction_id"],
+                transfer_id= row["transaction_transfer_id"],
                 is_active= bool(row["transaction_is_active"])
             )
 

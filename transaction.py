@@ -20,6 +20,7 @@ class Transaction:
                  account : Account,                                             # Счёт списания/пополнения
                  comment : str,                                                 # Комментарий
                  transaction_id : int | None = None,                            # Уникальный номер транзакции
+                 transfer_id : int | None = None,                               # Уникальный номер перевода
                  is_active : bool = True                                        # Состояние транзакции
                  ):                                                                                                                                                                                                                       
 
@@ -70,7 +71,7 @@ class Transaction:
 
         self.operation = operation  
 
-        # Проверка правильности транзакции
+        # Проверка правильности идентификатора транзакции
         if transaction_id is not None:
             if not isinstance(transaction_id, int):
                 raise TypeError("Идентификатор транзакции должен быть int или None")
@@ -79,6 +80,16 @@ class Transaction:
                 raise ValueError("Идентификатор транзакции должен быть больше нуля")
 
         self.transaction_id = transaction_id
+
+        # Проверка правильности идентификатора перевода
+        if transfer_id is not None:
+            if not isinstance(transfer_id, int):
+                raise TypeError("Идентификатор перевода должен быть int или None")
+
+            if transfer_id <= 0:
+                raise ValueError("Идентификатор перевода должен быть больше нуля")
+
+        self.transfer_id = transfer_id
 
         # Проверка правильности активного состояния
         if not isinstance(is_active, bool):
