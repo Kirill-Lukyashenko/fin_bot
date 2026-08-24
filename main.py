@@ -8,10 +8,11 @@ from datetime import date
 from transaction import OperationType
 from transaction_service import TransactionService
 from transfer import Transfer
+from transfer_repository import TransferRepository
 
 
 def main() -> None:
-    
+    """
     create_tables()
 
     check_work = "yes"
@@ -52,7 +53,7 @@ def main() -> None:
 
         acc.add_account(account)
         
-
+    """
     #acc_rep = AccountRepository()
     #tr_service = TransactionService()
 
@@ -91,6 +92,38 @@ def main() -> None:
     account.balance = Decimal("0.00")
     acc_rep.update_account(account)
     """
+
+    repository = TransferRepository()
+
+    """
+
+    transfer = repository.get_transfer_by_id(2)
+
+    print(transfer.transfer_id)
+    print(transfer.action_date)
+    print(transfer.source_account_id)
+    print(transfer.dest_account_id)
+    print(transfer.amount)
+    print(transfer.comment)
+    print(transfer.is_active)
+
+    """
+
+    transfers = repository.get_transfers_by_period(
+    start_date=date(2026, 8, 1),
+    end_date=date(2026, 8, 24)
+    )
+
+    for transfer in transfers:
+        print(
+            transfer.transfer_id,
+            transfer.action_date,
+            transfer.source_account_id,
+            transfer.dest_account_id,
+            transfer.amount,
+            transfer.comment,
+            transfer.is_active
+        )
 
 if __name__ == "__main__":
     main()

@@ -100,3 +100,95 @@ class TransferRepository:
             connection.close()
 
         return transfer
+
+    def get_transfers_by_period(self, start_date : date, end_date : date, limit : int = 50, offset : int = 0) -> list[Transfer]:
+        """Функция возвращает список объектов Transfer за определенный период"""
+
+        if not isinstance(start_date,date):
+            raise TypeError("Начальная дата должна быть объектом date")
+
+        if not isinstance(end_date,date):
+            raise TypeError("Конечная дата должна быть объектом date")
+
+        if start_date > end_date:
+            raise ValueError("Дата начала не может быть больше даты конца")
+
+        if type(limit) is not int:
+            raise TypeError("Лимит должен быть целочисленным")
+
+        if type(offset) is not int:
+            raise TypeError("Смещение должно быть целочисленным")
+
+        if limit <= 0:
+            raise ValueError("Лимит должен быть больше нуля")
+
+        if offset < 0:
+            raise ValueError("Смещение должно быть больше или равно нулю")
+
+        connection = get_connection()
+
+        transfers : list[Transfer] = []
+
+        try:
+
+            rows = connection.execute(
+                """
+                SELECT
+                    tr.id AS transfer_id,
+                    tr.is_active AS transfer_is_active,
+                    t_out.action_date AS action_date,
+                    t_out.account_id AS source_account_id,
+                    t_in.account_id AS dest_account_id,
+                    t_out.amount_minor AS amount_minor,
+                    t_out.comment AS comment,
+                    t_out.is_active AS out_is_active,
+                    t_in.is_active AS in_is_active
+                FROM transactions AS t_out
+                JOIN transactions AS t_in
+                    ON t_out.transfer_id = t_in.transfer_id
+                JOIN transfers AS tr
+                    ON tr.id = t_out.transfer_id
+                WHERE t_out.operation = ?
+                AND t_in.operation = ?
+                AND t_out.action_date >= ?
+                AND t_out.action_date <= ?
+                ORDER BY 
+                    t_out.action_date DESC,
+                    tr.id DESC
+                LIMIT ?
+                OFFSET ?
+                """,
+                (
+                    OperationType.TRANSFER_OUT.value,
+                    OperationType.TRANSFER_IN.value,
+                    start_date.isoformat(),
+                    end_date.isoformat(),
+                    limit,
+                    offset,
+                )
+            ).fetchall()
+
+            for row in rows:
+
+                if bool(row["out_is_active"]) != bool(row["transfer_is_active"]):
+                    raise ValueError("Состояние исходящей транзакции не соответствует состоянию перевода")
+
+                if bool(row["in_is_active"]) != bool(row["transfer_is_active"]):
+                    raise ValueError("Состояние входящей транзакции не соответствует состоянию перевода")
+
+                transfer = Transfer(
+                    action_date= date.fromisoformat(row["action_date"]),
+                    source_account_id= row["source_account_id"],
+                    dest_account_id= row["dest_account_id"],
+                    amount= from_minor_units(row["amount_minor"]),
+                    comment= row["comment"],
+                    transfer_id= row["transfer_id"],
+                    is_active= bool(row["transfer_is_active"])
+                )
+
+                transfers.append(transfer)
+
+        finally:
+            connection.close()
+
+        return transfers
