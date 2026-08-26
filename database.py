@@ -20,10 +20,23 @@ def create_tables() -> None:
     """Создаёт необходимые таблицы, если они ещё не существуют."""
 
     with get_connection() as connection:
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_user_id INTEGER NOT NULL UNIQUE,
+                is_active INTEGER NOT NULL DEFAULT 1
+                    CHECK (is_active IN(0,1))
+            )
+            """
+        )
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
 
                 source TEXT NOT NULL,
                 acc_type TEXT NOT NULL,
@@ -31,10 +44,15 @@ def create_tables() -> None:
                 requisites TEXT,
                 currency TEXT NOT NULL,
                 
-                balance_minor INTEGER NOT NULL DEFAULT 0,
+                balance_minor INTEGER NOT NULL DEFAULT 0
+                    CHECK(balance_minor >=0),
                 limit_minor INTEGER,
 
-                is_active INTEGER NOT  NULL DEFAULT 1 CHECK (is_active IN(0,1))
+                is_active INTEGER NOT  NULL DEFAULT 1 CHECK (is_active IN(0,1)),
+
+                FOREIGN KEY (user_id)
+                    REFERENCES users(user_id)
+                    ON DELETE RESTRICT
             )
             """
         )
@@ -86,6 +104,14 @@ def create_tables() -> None:
                     REFERENCES transfers(id)
                     ON DELETE RESTRICT
             )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS 
+                idx_accounts_user_id
+            ON accounts(user_id)
             """
         )
 

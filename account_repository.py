@@ -28,6 +28,7 @@ class AccountRepository:
             cursor = connection.execute(
                 """
                 INSERT INTO accounts (
+                    user_id,
                     source,
                     acc_type,
                     product_name,
@@ -37,9 +38,10 @@ class AccountRepository:
                     limit_minor,
                     is_active
                 )
-                VALUES (?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?)
                 """,
                 (
+                    account.user_id,
                     account.source,
                     account.acc_type,
                     account.product_name,
@@ -65,7 +67,7 @@ class AccountRepository:
         finally:
             connection.close()
 
-    def get_account_by_id(self, account_id : int) -> Account | None:
+    def get_account_by_id(self, account_id : int, user_id : int) -> Account | None:
         """Восстанавливает объект Account по прочитаной строке SQL"""
 
         if type(account_id) is not int:
@@ -74,6 +76,12 @@ class AccountRepository:
         if account_id <= 0:
             raise ValueError("Идентификатор счёта должен быть больше нуля")
 
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленного типа")
+
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+
         connection = get_connection()
 
         try:
@@ -81,6 +89,7 @@ class AccountRepository:
                 """
                 SELECT
                     id,
+                    user_id,
                     source,
                     acc_type,
                     product_name,
@@ -91,8 +100,12 @@ class AccountRepository:
                     is_active
                 FROM accounts
                 WHERE id = ?
+                AND user_id = ?
                 """,
-                (account_id,),
+                (
+                    account_id,
+                    user_id,
+                )
             ).fetchone()
 
         finally:
@@ -104,6 +117,7 @@ class AccountRepository:
 
         return Account(
             object_number = row["id"],
+            user_id= row["user_id"],
             source = row["source"],
             acc_type = row["acc_type"],
             product_name = row["product_name"],
@@ -117,8 +131,14 @@ class AccountRepository:
             is_active = bool(row["is_active"])
         )
 
-    def get_all_accounts(self) -> list[Account]:
+    def get_all_accounts(self, user_id : int) -> list[Account]:
         """Возвращает список всех аккаунтов добавленных в базу"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленного типа")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         connection = get_connection()
 
@@ -127,6 +147,7 @@ class AccountRepository:
                 """
                 SELECT
                     id,
+                    user_id,
                     source,
                     acc_type,
                     product_name,
@@ -136,8 +157,12 @@ class AccountRepository:
                     limit_minor,
                     is_active
                 FROM accounts
+                WHERE user_id = ?
                 ORDER BY id
-                """
+                """,
+                (
+                    user_id,
+                )
             ).fetchall()
 
         finally:
@@ -149,6 +174,7 @@ class AccountRepository:
 
             account = Account(
             object_number = row["id"],
+            user_id= row["user_id"],
             source = row["source"],
             acc_type = row["acc_type"],
             product_name = row["product_name"],
@@ -166,8 +192,14 @@ class AccountRepository:
 
         return accounts
 
-    def get_active_accounts(self) -> list[Account]:
+    def get_active_accounts(self, user_id : int) -> list[Account]:
         """Возвращает список всех активных аккаунтов добавленных в базу"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленного типа")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         connection = get_connection()
 
@@ -176,6 +208,7 @@ class AccountRepository:
                 """
                 SELECT
                     id,
+                    user_id,
                     source,
                     acc_type,
                     product_name,
@@ -186,8 +219,12 @@ class AccountRepository:
                     is_active
                 FROM accounts
                 WHERE is_active = 1
+                AND user_id = ?
                 ORDER BY id
-                """
+                """,
+                (
+                    user_id,
+                )
             ).fetchall()
 
         finally:
@@ -199,6 +236,7 @@ class AccountRepository:
 
             account = Account(
             object_number = row["id"],
+            user_id= row["user_id"],
             source = row["source"],
             acc_type = row["acc_type"],
             product_name = row["product_name"],
@@ -216,11 +254,17 @@ class AccountRepository:
 
         return accounts
 
-    def delete_account_by_id(self, account_id : int) -> None:
+    def delete_account_by_id(self, account_id : int, user_id : int) -> None:
         """
         Функция удаляет случайные или неправильные записи из таблицы
         Применяется только для случайных записей без финансовой истории
         """
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленного типа")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(account_id) is not int:
             raise TypeError("Идентификатор счёта должен быть целочисленного типа")
@@ -235,8 +279,12 @@ class AccountRepository:
                     """
                     DELETE FROM accounts
                     WHERE id = ?
+                    AND user_id = ?
                     """,
-                    (account_id,)
+                    (
+                        account_id,
+                        user_id,
+                    )
                 )
 
             if cursor.rowcount == 0:
@@ -287,6 +335,7 @@ class AccountRepository:
                     limit_minor = ?,
                     is_active = ?
                 WHERE id = ?
+                AND user_id = ?
                 """,
                 (
                     account.source,
@@ -298,6 +347,7 @@ class AccountRepository:
                     limit_minor,
                     int(account.is_active),
                     account.object_number,
+                    account.user_id,
                  )
             )
 
