@@ -31,3 +31,14 @@ class User:
                 raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         self.user_id = user_id
+
+    def activate(self) -> None:
+        self.is_active = True
+
+    def deactivate(self) -> None:
+        self.is_active = False
+
+    def check_state(self) -> str:
+        if self.is_active:
+            return "Пользователь активен"
+        return "Пользователь деактивирован"
