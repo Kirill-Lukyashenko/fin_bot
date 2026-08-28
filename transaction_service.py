@@ -6,8 +6,14 @@ from transfer import Transfer
 class TransactionService:
     """Логика поведения финансовых транзакций"""
 
-    def execute_transaction(self, transaction:Transaction) -> int:
+    def execute_transaction(self, transaction:Transaction, user_id : int) -> int:
         """Проводит транзакцию и изменяет баланс счёта"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <= 0 :
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if not isinstance(transaction, Transaction):
             raise TypeError("Должен быть передан объект Transaction")
@@ -24,6 +30,9 @@ class TransactionService:
         if transaction.operation not in (OperationType.INCOME, OperationType.EXPENSE,):
             raise ValueError("Через execute_transaction можно проводить только доход или расход")
 
+        if transaction.account.user_id != user_id:
+            raise ValueError("Счёт транзакции не принадлежит пользователю")
+
         amount_minor = to_minor_units(transaction.amount)
 
         connection = get_connection()
@@ -32,20 +41,30 @@ class TransactionService:
 
             account_row = connection.execute(
                 """
-                SELECT is_active
-                FROM accounts
-                WHERE id = ?
+                SELECT 
+                    a.is_active as account_is_active,
+                    u.is_active as user_is_active
+                FROM accounts AS a
+                JOIN users AS u
+                ON
+                    u.user_id = a.user_id
+                WHERE a.id = ?
+                AND a.user_id = ?
                 """,
                 (
                     transaction.account.object_number,
+                    user_id,
                 )
             ).fetchone()
 
             if account_row is None:
                 raise ValueError("Счёт данной транзакции не найден")
 
-            if not bool(account_row["is_active"]):
-                raise ValueError("Нельзя провести транзакцию по неактивному счёту")
+            if not bool(account_row["account_is_active"]):
+                raise ValueError("Счёт деактивирован")
+
+            if not bool(account_row["user_is_active"]):
+                raise ValueError("Пользователь деактивирован")
 
             cursor = connection.execute(
                 """
@@ -79,10 +98,13 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor + ?
                     WHERE id = ?
+                    AND user_id = ?
+                    AND is_active = 1
                     """,
                     (
                         amount_minor,
                         transaction.account.object_number,
+                        user_id,
                     )
                 )
 
@@ -94,16 +116,19 @@ class TransactionService:
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
                     AND balance_minor >= ?
+                    AND user_id = ?
+                    AND is_active = 1
                     """,
                     (
                         amount_minor,
                         transaction.account.object_number,
                         amount_minor,
+                        user_id,
                     )
                 )
 
             if amount_cursor.rowcount == 0:
-                raise ValueError("На счете недостаточно средств")
+                raise ValueError("На счете недостаточно средств или счёт недоступен")
 
             transaction_id = cursor.lastrowid
 
@@ -126,8 +151,14 @@ class TransactionService:
             
         return transaction.transaction_id
     
-    def cancel_transaction(self, transaction_id: int) -> None:
+    def cancel_transaction(self, transaction_id: int, user_id : int) -> None:
         """Функция отменяет транзакцию"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+        
+        if user_id <= 0 :
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(transaction_id) is not int:
             raise TypeError("Идентификатор транзакции должен быть целочисленным")
