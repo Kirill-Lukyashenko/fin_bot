@@ -172,29 +172,34 @@ class TransactionService:
             row = connection.execute(
                 """
                 SELECT
-                    account_id,
-                    operation,
-                    amount_minor,
-                    is_active,
-                    transfer_id
-                FROM transactions
-                WHERE id = ?
+                    t.account_id AS transaction_account_id,
+                    t.operation AS transaction_operation,
+                    t.amount_minor,
+                    t.is_active AS transaction_is_active,
+                    t.transfer_id AS transaction_transfer
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.id = ?
+                AND a.user_id = ?
                 """,
                 (
                     transaction_id,
+                    user_id,
                 )
             ).fetchone()
 
             if row is None:
-                raise ValueError("Транзакции с таким идентификатором не существует")
+                raise ValueError("Транзакция не существует")
 
-            if row["transfer_id"] is not None:
+            if row["transaction_transfer"] is not None:
                 raise ValueError("Эта транзакция является частью перевода, Необходимо отменять весь перевод")
 
-            if not bool(row["is_active"]):
+            if not bool(row["transaction_is_active"]):
                 raise ValueError("Транзакция уже отменена")
 
-            operation = OperationType(row["operation"])
+            operation = OperationType(row["transaction_operation"])
 
             transaction_cursor = connection.execute(
                             """
@@ -202,9 +207,17 @@ class TransactionService:
                             SET is_active = 0
                             WHERE id = ?
                             AND is_active = 1
+                            AND transfer_id IS NULL
+                            AND EXISTS (
+                                SELECT 1
+                                FROM accounts AS a
+                                WHERE a.id = transactions.account_id
+                                AND a.user_id = ?
+                            )
                             """,
                             (
                                 transaction_id,
+                                user_id,
                             )
             )
 
@@ -217,10 +230,12 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor + ?
                     WHERE id = ?
+                    AND user_id = ?
                     """,
                     (
                         row["amount_minor"],
-                        row["account_id"],
+                        row["transaction_account_id"],
+                        user_id,
                     )
                 )
 
@@ -231,19 +246,21 @@ class TransactionService:
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
                     AND balance_minor >= ?
+                    AND user_id = ?
                     """,
                     (
                         row["amount_minor"],
-                        row["account_id"],
+                        row["transaction_account_id"],
                         row["amount_minor"],
+                        user_id,
                     )
                 )
 
             else:
-                raise ValueError("Неизвестный тип финансововой операции")
+                raise ValueError("Неизвестный тип финансовой операции")
 
             if account_cursor.rowcount == 0:
-                raise ValueError("На счете недостаточно средств")
+                raise ValueError("Не удалось скорректировать баланс счёта")
 
             connection.commit()
 
@@ -254,8 +271,14 @@ class TransactionService:
         finally:
             connection.close()
 
-    def restore_transaction(self, transaction_id: int) -> None:
+    def restore_transaction(self, transaction_id: int, user_id : int) -> None:
         """Функция восстанавливает деактивированную транзакцию"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <= 0 :
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(transaction_id) is not int:
             raise TypeError("Идентификатор транзакции должен быть целочисленным")
@@ -270,29 +293,34 @@ class TransactionService:
             row = connection.execute(
                 """
                 SELECT
-                    account_id,
-                    operation,
-                    amount_minor,
-                    is_active,
-                    transfer_id
-                FROM transactions
-                WHERE id = ?
+                    t.account_id AS transaction_account_id,
+                    t.operation AS transaction_operation,
+                    t.amount_minor,
+                    t.is_active AS transaction_is_active,
+                    t.transfer_id AS transaction_transfer_id
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.id = ?
+                AND a.user_id = ?
                 """,
                 (
                     transaction_id,
+                    user_id,
                 )
             ).fetchone()
 
             if row is None:
-                raise ValueError("Транзакции с таким идентификатором не существует")
+                raise ValueError("Транзакция не существует")
 
-            if row["transfer_id"] is not None:
+            if row["transaction_transfer_id"] is not None:
                 raise ValueError("Эта транзакция является частью перевода, Необходимо восстанавливать весь перевод")
     
-            if bool(row["is_active"]):
+            if bool(row["transaction_is_active"]):
                 raise ValueError("Транзакция уже восстановлена")
 
-            operation = OperationType(row["operation"])
+            operation = OperationType(row["transaction_operation"])
 
             transaction_cursor = connection.execute(
                 """
@@ -300,9 +328,17 @@ class TransactionService:
                 SET is_active = 1
                 WHERE id = ?
                 AND is_active = 0
+                AND transfer_id IS NULL
+                AND EXISTS(
+                    SELECT 1
+                    FROM accounts AS a
+                    WHERE a.id = transactions.account_id
+                    AND a.user_id = ?
+                )
                 """,
                 (
                     transaction_id,
+                    user_id,
                 )
             )
 
@@ -315,10 +351,12 @@ class TransactionService:
                     UPDATE accounts
                     SET balance_minor = balance_minor + ?
                     WHERE id = ?
+                    AND user_id = ?
                     """,
                     (
                         row["amount_minor"],
-                        row["account_id"],
+                        row["transaction_account_id"],
+                        user_id,
                     )
                 )
 
@@ -329,11 +367,13 @@ class TransactionService:
                     SET balance_minor = balance_minor - ?
                     WHERE id = ?
                     AND balance_minor >= ?
+                    AND user_id = ?
                     """,
                     (
                         row["amount_minor"],
-                        row["account_id"],
+                        row["transaction_account_id"],
                         row["amount_minor"],
+                        user_id,
                     )
                 )
 
@@ -341,7 +381,7 @@ class TransactionService:
                 raise ValueError("Неизвестный тип финансовой операции")
 
             if account_cursor.rowcount == 0:
-                raise ValueError("На счете недостаточно средств")
+                raise ValueError("Не удалось скорректировать баланс счёта")
             
             connection.commit()
 
