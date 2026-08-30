@@ -7,8 +7,14 @@ from datetime import date
 class TransferRepository:
     """Описание работы с таблицей transfers"""
 
-    def get_transfer_by_id(self, transfer_id : int) -> Transfer:
+    def get_transfer_by_id(self, transfer_id : int, user_id : int) -> Transfer:
         """Функция возвращает объект transfer по идентификатору"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(transfer_id) is not int:
             raise TypeError("Идентификатор перевода должен быть целочисленным")
@@ -23,12 +29,21 @@ class TransferRepository:
             transfer_row = connection.execute(
                 """
                 SELECT
-                    is_active
-                FROM transfers
-                WHERE id = ?
+                    tr.is_active
+                FROM transfers AS tr
+                JOIN transactions AS t
+                ON
+                    t.transfer_id = tr.id
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE tr.id = ?
+                AND a.user_id = ?
+                LIMIT 1
                 """,
                 (
                     transfer_id,
+                    user_id,
                 )
             ).fetchone()
 
@@ -38,20 +53,26 @@ class TransferRepository:
             transfer_out_row = connection.execute(
                 """
                 SELECT
-                    account_id,
-                    action_date,
-                    amount_minor,
-                    comment,
-                    is_active
-                FROM transactions
+                    t.account_id,
+                    t.action_date,
+                    t.amount_minor,
+                    t.comment,
+                    t.is_active
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
                 WHERE
-                    transfer_id = ?
+                    t.transfer_id = ?
                 AND
-                    operation = ?
+                    t.operation = ?
+                AND
+                    a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_OUT.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -61,17 +82,23 @@ class TransferRepository:
             transfer_in_row = connection.execute(
                 """
                 SELECT
-                    account_id,
-                    is_active
-                FROM transactions
+                    t.account_id,
+                    t.is_active
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
                 WHERE
-                    transfer_id = ?
+                    t.transfer_id = ?
                 AND
-                    operation = ?
+                    t.operation = ?
+                AND
+                    a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_IN.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -101,8 +128,14 @@ class TransferRepository:
 
         return transfer
 
-    def get_transfers_by_period(self, start_date : date, end_date : date, limit : int = 50, offset : int = 0) -> list[Transfer]:
+    def get_transfers_by_period(self, start_date : date, end_date : date, user_id : int, limit : int = 50, offset : int = 0) -> list[Transfer]:
         """Функция возвращает список объектов Transfer за определенный период"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+                
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if not isinstance(start_date,date):
             raise TypeError("Начальная дата должна быть объектом date")
@@ -148,10 +181,16 @@ class TransferRepository:
                     ON t_out.transfer_id = t_in.transfer_id
                 JOIN transfers AS tr
                     ON tr.id = t_out.transfer_id
+                JOIN accounts AS a_out
+                    ON t_out.account_id = a_out.id
+                JOIN accounts AS a_in
+                    ON t_in.account_id = a_in.id
                 WHERE t_out.operation = ?
                 AND t_in.operation = ?
                 AND t_out.action_date >= ?
                 AND t_out.action_date <= ?
+                AND a_out.user_id = ?
+                AND a_in.user_id = ?
                 ORDER BY 
                     t_out.action_date DESC,
                     tr.id DESC
@@ -163,6 +202,8 @@ class TransferRepository:
                     OperationType.TRANSFER_IN.value,
                     start_date.isoformat(),
                     end_date.isoformat(),
+                    user_id,
+                    user_id,
                     limit,
                     offset,
                 )

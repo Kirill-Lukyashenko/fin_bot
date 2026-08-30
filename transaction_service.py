@@ -392,8 +392,14 @@ class TransactionService:
         finally:
             connection.close()
 
-    def execute_transfer(self, transfer : Transfer) -> int:
+    def execute_transfer(self, transfer : Transfer, user_id :int) -> int:
         """Функция выполняет перевод средств с одного счёта на другой"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if not isinstance(transfer, Transfer):
             raise TypeError("Должен быть передан объект трансфер")
@@ -412,14 +418,21 @@ class TransactionService:
             source_account= connection.execute(
                 """
                 SELECT
-                    currency,
-                    is_active
-                FROM accounts
+                    a.currency,
+                    a.is_active AS account_is_active,
+                    u.is_active AS user_is_active
+                FROM accounts AS a
+                JOIN users AS u
+                ON
+                    u.user_id = a.user_id
                 WHERE
-                    id = ?
+                    a.id = ?
+                AND
+                    a.user_id = ?
                 """,
                 (
                     transfer.source_account_id,
+                    user_id,
                 )
             ).fetchone()
 
@@ -431,19 +444,25 @@ class TransactionService:
                 FROM accounts
                 WHERE
                     id = ?
+                AND
+                    user_id = ?
                 """,
                 (
                     transfer.dest_account_id,
+                    user_id,
                 )
             ).fetchone()
 
             if source_account is None:
                 raise ValueError("Счёт отправителя не найден")
 
+            if not bool(source_account["user_is_active"]):
+                raise ValueError("Пользователь деактивирован")
+
             if dest_account is None:
                 raise ValueError("Счёт получателя не найден")
 
-            if not bool(source_account["is_active"]):
+            if not bool(source_account["account_is_active"]):
                 raise ValueError("Счёт отправителя не активен")
 
             if not bool(dest_account["is_active"]):
@@ -523,11 +542,14 @@ class TransactionService:
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
                 AND  balance_minor >= ?
+                AND user_id = ?
+                AND is_active = 1
                 """,
                 (
                     amount_minor,
                     transfer.source_account_id,
                     amount_minor,
+                    user_id,
                 )
             )
 
@@ -539,10 +561,13 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor + ?
                 WHERE id = ?
+                AND user_id = ?
+                AND is_active = 1
                 """,
                 (
                     amount_minor,
-                    transfer.dest_account_id
+                    transfer.dest_account_id,
+                    user_id,
                 )
             )
 
@@ -562,8 +587,14 @@ class TransactionService:
         
         return transfer.transfer_id
 
-    def cancel_transfer(self, transfer_id: int) -> None:
+    def cancel_transfer(self, transfer_id: int, user_id : int) -> None:
         """Функция выполняет деактивацию перевода между счетами"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(transfer_id) is not int:
             raise TypeError("Идентификатор перевода должен быть целочисленным")
@@ -577,12 +608,21 @@ class TransactionService:
             transfer_row = connection.execute(
                 """
                 SELECT
-                    is_active
-                FROM transfers
-                WHERE id = ?
+                    tr.is_active
+                FROM transfers AS tr
+                JOIN transactions AS t
+                ON
+                    t.transfer_id = tr.id
+                JOIN accounts AS a
+                ON
+                    a.id = t.account_id
+                WHERE tr.id = ?
+                AND a.user_id = ?
+                LIMIT 1
                 """,
                 (
                     transfer_id,
+                    user_id,
                 )
             ).fetchone()
 
@@ -595,16 +635,21 @@ class TransactionService:
             transaction_in_transfer_row = connection.execute(
                 """
                 SELECT
-                    amount_minor,
-                    is_active,
-                    account_id
-                FROM transactions
-                WHERE transfer_id = ?
-                AND operation = ?
+                    t.amount_minor,
+                    t.is_active,
+                    t.account_id
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.transfer_id = ?
+                AND t.operation = ?
+                AND a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_IN.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -619,16 +664,21 @@ class TransactionService:
             transaction_out_transfer_row = connection.execute(
                 """
                 SELECT
-                    amount_minor,
-                    is_active,
-                    account_id
-                FROM transactions
-                WHERE transfer_id = ?
-                AND operation = ?
+                    t.amount_minor,
+                    t.is_active,
+                    t.account_id
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.transfer_id = ?
+                AND t.operation = ?
+                AND a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_OUT.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -661,9 +711,18 @@ class TransactionService:
                 SET is_active = 0
                 WHERE transfer_id = ?
                 AND is_active = 1
+                AND operation IN (?,?)
+                AND account_id IN (
+                    SELECT id
+                    FROM accounts
+                    WHERE user_id = ?
+                )
                 """,
                 (
                     transfer_id,
+                    OperationType.TRANSFER_IN.value,
+                    OperationType.TRANSFER_OUT.value,
+                    user_id,
                 )
             )
 
@@ -675,10 +734,12 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor + ?
                 WHERE id = ?
+                AND user_id = ?
                 """,
                 (
                     transaction_out_transfer_row["amount_minor"],
                     source_acc,
+                    user_id,
                 )
             )
 
@@ -691,11 +752,13 @@ class TransactionService:
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
                 AND balance_minor >= ?
+                AND user_id = ?
                 """,
                 (
                     transaction_in_transfer_row["amount_minor"],
                     dest_acc,
                     transaction_in_transfer_row["amount_minor"],
+                    user_id,
                 )
             )
 
@@ -711,8 +774,14 @@ class TransactionService:
         finally:
             connection.close()
 
-    def restore_transfer(self, transfer_id : int) -> None:
+    def restore_transfer(self, transfer_id : int, user_id : int) -> None:
         """Функция активирует перевод"""
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+        
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
         if type(transfer_id) is not int:
             raise TypeError("Идентификатор должен быть целочисленным")
@@ -727,12 +796,21 @@ class TransactionService:
             transfer_row = connection.execute(
                 """
                 SELECT
-                    is_active
-                FROM transfers
-                WHERE id = ?
+                    tr.is_active
+                FROM transfers AS tr
+                JOIN transactions AS t
+                ON
+                    t.transfer_id = tr.id
+                JOIN accounts AS a
+                ON
+                    a.id = t.account_id 
+                WHERE tr.id = ?
+                AND a.user_id = ?
+                LIMIT 1
                 """,
                 (
                     transfer_id,
+                    user_id,
                 )
             ).fetchone()
 
@@ -745,16 +823,21 @@ class TransactionService:
             transaction_out_transfer_row = connection.execute(
                 """
                 SELECT
-                    amount_minor,
-                    is_active,
-                    account_id
-                FROM transactions
-                WHERE transfer_id =?
-                AND operation = ?
+                    t.amount_minor,
+                    t.is_active,
+                    t.account_id
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.transfer_id = ?
+                AND t.operation = ?
+                AND a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_OUT.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -769,16 +852,21 @@ class TransactionService:
             transaction_in_transfer_row = connection.execute(
                 """
                 SELECT
-                    amount_minor,
-                    is_active,
-                    account_id
-                FROM transactions
-                WHERE transfer_id = ?
-                AND operation = ?
+                    t.amount_minor,
+                    t.is_active,
+                    t.account_id
+                FROM transactions AS t
+                JOIN accounts AS a
+                ON
+                    t.account_id = a.id
+                WHERE t.transfer_id = ?
+                AND t.operation = ?
+                AND a.user_id = ?
                 """,
                 (
                     transfer_id,
                     OperationType.TRANSFER_IN.value,
+                    user_id,
                 )
             ).fetchone()
 
@@ -811,9 +899,18 @@ class TransactionService:
                 SET is_active = 1
                 WHERE transfer_id = ?
                 AND is_active = 0
+                AND operation IN (?,?)
+                AND account_id IN (
+                    SELECT id
+                    FROM accounts
+                    WHERE user_id = ?
+                )
                 """,
                 (
                     transfer_id,
+                    OperationType.TRANSFER_IN.value,
+                    OperationType.TRANSFER_OUT.value,
+                    user_id,
                 )
             )
 
@@ -826,11 +923,13 @@ class TransactionService:
                 SET balance_minor = balance_minor - ?
                 WHERE id = ?
                 AND balance_minor >= ?
+                AND user_id = ?
                 """,
                 (
                     transaction_out_transfer_row["amount_minor"],
                     source_acc,
                     transaction_out_transfer_row["amount_minor"],
+                    user_id,
                 )
             )
 
@@ -842,10 +941,12 @@ class TransactionService:
                 UPDATE accounts
                 SET balance_minor = balance_minor + ?
                 WHERE id = ?
+                AND user_id =?
                 """,
                 (
                     transaction_in_transfer_row["amount_minor"],
                     dest_acc,
+                    user_id,
                 )
             )
 
