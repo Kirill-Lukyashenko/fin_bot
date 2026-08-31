@@ -36,3 +36,28 @@ accounts_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=  True
 )
+
+fsm_navigation_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text= "⬅️ Назад")
+        ],
+        [
+            KeyboardButton(text= "❌ Отмена")
+        ],
+    ],
+    resize_keyboard= True
+)
+
+account_confirm_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text= "✅ Создать счёт")
+        ],
+        [
+            KeyboardButton(text= "⬅️ Назад"),
+            KeyboardButton(text= "❌ Отмена")
+        ],
+    ],
+    resize_keyboard= True
+)
