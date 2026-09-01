@@ -6,7 +6,6 @@ from aiogram.filters import StateFilter
 
 from decimal import Decimal, InvalidOperation
 
-from user import User
 from user_repository import UserRepository
 
 from account import Account
@@ -29,8 +28,14 @@ class CreateAccount(StatesGroup):
     balance = State()
     confirm = State()
 
+class GetAccount(StatesGroup):
+
+    get_by_id = State()
+
 @router.message(F.text == "💰 Счета")
-async def accounts_handler(message : Message) -> None:
+async def accounts_handler(message : Message, state : FSMContext) -> None:
+
+    await state.clear()
 
     if message.from_user is None:
         return
@@ -53,7 +58,9 @@ async def accounts_handler(message : Message) -> None:
     )
 
 @router.message(F.text == "Получить список счетов")
-async def get_accounts_handler(message : Message) -> None:
+async def get_accounts_handler(message : Message, state : FSMContext) -> None:
+
+    await state.clear()
 
     if message.from_user is None:
         return
@@ -152,17 +159,17 @@ async def create_account_handler(message : Message, state : FSMContext) -> None:
         reply_markup= fsm_navigation_keyboard
     )
 
-@router.message(StateFilter(CreateAccount), F.text == "❌ Отмена")
+@router.message(StateFilter(CreateAccount, GetAccount), F.text == "❌ Отмена")
 async def cancel_create_account(message : Message, state : FSMContext) -> None:
 
     await state.clear()
 
     await message.answer(
-        "Создание счёта отменено",
+        "Получение или создание счёта отменено",
         reply_markup= accounts_keyboard
     )
 
-@router.message(StateFilter(CreateAccount), F.text == "⬅️ Назад")  
+@router.message(StateFilter(CreateAccount, GetAccount), F.text == "⬅️ Назад")  
 async def back_create_account(message : Message, state : FSMContext) -> None:
 
     current_state = await state.get_state()
@@ -246,6 +253,104 @@ async def back_create_account(message : Message, state : FSMContext) -> None:
 
         return
 
+    if current_state == GetAccount.get_by_id.state:
+
+        await state.clear()
+
+        await message.answer(
+            "Возвращаемся в раздел управления счетами",
+            reply_markup= accounts_keyboard
+        )
+
+        return
+
+@router.message(F.text == "Получить счёт по идентификатору")
+async def get_account_by_id_handler(message : Message, state : FSMContext):
+
+    if message.from_user is None:
+        return
+            
+    telegram_user_id = message.from_user.id
+            
+    user = user_repository.get_user_by_telegram_id(telegram_user_id)
+            
+    if user is None:
+        await state.clear()
+        await message.answer("Сначала выполните команду /start")
+        return
+            
+    if not user.is_active:
+        await state.clear()
+        await message.answer("Пользователь деактивирован!")
+        return
+
+    await state.clear()
+
+    await state.set_state(GetAccount.get_by_id)
+
+    await message.answer(
+        "Введите идентификатор счёта",
+        reply_markup= fsm_navigation_keyboard
+    )
+
+@router.message(GetAccount.get_by_id)
+async def get_account(message : Message, state : FSMContext):
+
+    if message.from_user is None:
+        return
+        
+    telegram_user_id = message.from_user.id
+        
+    user = user_repository.get_user_by_telegram_id(telegram_user_id)
+        
+    if user is None:
+        await state.clear()
+        await message.answer("Сначала выполните команду /start")
+        return
+        
+    if not user.is_active:
+        await state.clear()
+        await message.answer("Пользователь деактивирован!")
+        return
+
+    if message.text is None:
+
+        await message.answer("Введите идентификатор счёта числом")
+        return
+
+    try:
+
+        acc_id = int(message.text.strip())
+
+    except ValueError:
+
+        await message.answer("Идентификатор должен быть целочисленным")
+        return
+
+    if acc_id <= 0 :
+
+        await message.answer("Идентификатор должен быть больше нуля")
+        return
+
+    account = account_repository.get_account_by_id(acc_id, user.user_id)
+
+    if account is None:
+        await message.answer(
+            "Счёт c таким идентификатором не найден", 
+            reply_markup= fsm_navigation_keyboard
+        )
+        return
+
+    await state.clear()
+
+    await message.answer(
+        f"Счёт с идентификатором {account.object_number}\n\n"
+        f"Источник: {account.source}\n"
+        f"Тип счёта: {account.acc_type}\n"
+        f"Название продукта: {account.product_name}\n"
+        f"Баланс: {account.balance} {account.currency}",
+        reply_markup= accounts_keyboard
+    )
 
 @router.message(CreateAccount.source)
 async def create_account_source(message : Message, state : FSMContext) -> None:
