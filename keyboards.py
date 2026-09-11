@@ -62,10 +62,10 @@ account_confirm_keyboard = ReplyKeyboardMarkup(
     resize_keyboard= True
 )
 
-income_confirm_keyboard = ReplyKeyboardMarkup(
+operation_confirm_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text= "✅ Добавить доход")
+            KeyboardButton(text= "✅ Подтвердить операцию")
         ],
         [
             KeyboardButton(text= "⬅️ Назад"),
