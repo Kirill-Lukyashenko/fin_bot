@@ -87,3 +87,13 @@ transfer_confirm_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard= True
 )
+
+statistics_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Сумма на всех счетах"),
+            KeyboardButton(text="Главное меню")
+        ],
+    ],
+    resize_keyboard= True
+)
