@@ -92,6 +92,13 @@ statistics_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="Сумма на всех счетах"),
+            KeyboardButton(text="Расходы за сегодня"),
+        ],
+        [
+            KeyboardButton(text="Расходы за текущую неделю"),
+            KeyboardButton(text="Расходы за текущий месяц")
+        ],
+        [
             KeyboardButton(text="Главное меню")
         ],
     ],
