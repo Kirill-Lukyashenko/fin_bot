@@ -15,7 +15,8 @@ from transaction_service import TransactionService
 from keyboards import (
     main_keyboard,
     fsm_navigation_keyboard,
-    transfer_confirm_keyboard
+    transfer_confirm_keyboard,
+    accounts_select_keyboard
 )
 
 router = Router()

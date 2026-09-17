@@ -16,7 +16,8 @@ from user_repository import UserRepository
 from keyboards import (
     main_keyboard,
     fsm_navigation_keyboard,
-    operation_confirm_keyboard
+    operation_confirm_keyboard,
+    accounts_select_keyboard
 )
 
 router = Router()
@@ -66,13 +67,36 @@ async def create_income_handler(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if not accounts:
+
+        await message.answer(
+            "У вас нет активных счетов"
+        )
+
+        return
+
+    accounts_map : dict[str,int]= {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = f"{account.source}\n{account.product_name}"
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
     await state.clear()
+
+    await state.update_data(accounts_map = accounts_map)
 
     await state.set_state(CreateIncome.account_id)
 
     await message.answer(
-        "Введите ID счёта на который поступил доход",
-        reply_markup= fsm_navigation_keyboard
+        "Выберите счёт на который поступает доход",
+        reply_markup= accounts_select_keyboard(accounts)
     )
 
 @router.message(F.text == "📤 Расход")
@@ -98,13 +122,36 @@ async def create_expense_handler(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+    
+    if not accounts:
+    
+        await message.answer(
+            "У вас нет активных счетов"
+        )
+    
+        return
+
+    accounts_map : dict[str,int]= {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = f"{account.source}\n{account.product_name}"
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
     await state.clear()
+
+    await state.update_data(accounts_map = accounts_map)
 
     await state.set_state(CreateExpense.account_id)
 
     await message.answer(
-        "Введите ID счёта с которого расходуются средства",
-        reply_markup= fsm_navigation_keyboard
+        "Выберите счёт с которого расходуются средства",
+        reply_markup= accounts_select_keyboard(accounts)
     )
 
 @router.message(StateFilter(CreateIncome, CreateExpense), F.text == "❌ Отмена")
@@ -138,22 +185,112 @@ async def back_operation(message : Message, state : FSMContext) -> None:
 
     if current_state == CreateExpense.amount.state:
 
+        if message.from_user is None:
+
+            return
+
+        telegram_user_id = message.from_user.id
+
+        user = user_repository.get_user_by_telegram_id(telegram_user_id)
+
+        if user is None:
+
+            await state.clear()
+
+            await message.answer(
+                "Пользователь не найден",
+                reply_markup= main_keyboard
+            )
+
+            return
+
+        accounts = account_repository.get_active_accounts(user.user_id)
+
+        if not accounts:
+
+            await state.clear()
+        
+            await message.answer(
+                "У вас нет активных счетов",
+                reply_markup= main_keyboard
+            )
+        
+            return
+
+        accounts_map : dict[str,int]= {}
+
+        for account in accounts:
+
+            if account.product_name is not None:
+                button_text = f"{account.source}\n{account.product_name}"
+            else:
+                button_text = account.source
+
+            accounts_map[button_text] = account.object_number
+
+        await state.update_data(accounts_map = accounts_map)
+
         await state.set_state(CreateExpense.account_id)
 
         await message.answer(
-            "Введите идентификатор счёта, с которого произведён расход",
-            reply_markup= fsm_navigation_keyboard
+            "Выберите счёт, с которого произведён расход",
+            reply_markup= accounts_select_keyboard(accounts)
         )
 
         return
 
     if current_state == CreateIncome.amount.state:
+
+        if message.from_user is None:
+        
+                return
+        
+        telegram_user_id = message.from_user.id
+        
+        user = user_repository.get_user_by_telegram_id(telegram_user_id)
+        
+        if user is None:
+        
+            await state.clear()
+        
+            await message.answer(
+                "Пользователь не найден",
+                reply_markup= main_keyboard
+            )
+        
+            return
+        
+        accounts = account_repository.get_active_accounts(user.user_id)
+
+        if not accounts:
+        
+            await state.clear()
+                
+            await message.answer(
+                "У вас нет активных счетов",
+                reply_markup= main_keyboard
+            )
+                
+            return
+
+        accounts_map : dict[str,int]= {}
+        
+        for account in accounts:
+        
+            if account.product_name is not None:
+                button_text = f"{account.source}\n{account.product_name}"
+            else:
+                button_text = account.source
+        
+            accounts_map[button_text] = account.object_number
+        
+        await state.update_data(accounts_map = accounts_map)
     
         await state.set_state(CreateIncome.account_id)
     
         await message.answer(
-            "Введите идентификатор счёта, на который поступил доход",
-            reply_markup= fsm_navigation_keyboard
+            "Выберите счёт, на который поступил доход",
+            reply_markup= accounts_select_keyboard(accounts)
         )
     
         return
@@ -225,27 +362,24 @@ async def back_operation(message : Message, state : FSMContext) -> None:
 async def income_account(message : Message, state : FSMContext) -> None:
 
     if message.from_user is None:
+
         return
 
     if message.text is None:
 
-        await message.answer("Введите идентификатор счёта числом")
-
         return
 
-    try:
+    data = await state.get_data()
 
-        account_id = int(message.text.strip())
+    accounts_map = data.get("accounts_map",{})
 
-    except ValueError:
+    account_id = accounts_map.get(message.text)
 
-        await message.answer("Идентификатор должен быть целым числом")
+    if account_id is None:
 
-        return
-
-    if account_id <= 0 :
-
-        await message.answer("Идентификатор должен быть больше нуля")
+        await message.answer(
+            "Выберите счёт с помощью кнопки"
+        )
 
         return
 
@@ -310,28 +444,18 @@ async def expense_account(message : Message, state : FSMContext) -> None:
 
     if message.text is None:
 
-        await message.answer(
-            "Введите идентификатор счёта числом"
-        )
-
         return
 
-    try:
+    data = await state.get_data()
 
-        account_id = int(message.text.strip())
+    accounts_map = data.get("accounts_map",{})
 
-    except ValueError:
+    account_id = accounts_map.get(message.text)
 
-        await message.answer(
-            "Идентификатор должен быть целым числом"
-        )
-
-        return
-
-    if account_id <= 0:
+    if account_id is None:
 
         await message.answer(
-            "Идентификатор должен быть больше нуля"
+            "Выберите счёт с помощью кнопки"
         )
 
         return

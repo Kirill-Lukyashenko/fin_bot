@@ -1,4 +1,36 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+
+def accounts_select_keyboard(accounts) -> ReplyKeyboardMarkup:
+
+    builder = ReplyKeyboardBuilder()
+
+    for account in accounts:
+
+        if account.product_name is not None:
+
+            button_text = f"{account.source}\n{account.product_name}"
+
+        else:
+
+            button_text = account.source
+
+        builder.add(
+            KeyboardButton(text=button_text)
+        )
+
+    if len(accounts) <= 4:
+        builder.adjust(1)
+    else:
+        builder.adjust(2)
+
+    builder.row(
+        KeyboardButton(text="❌ Отмена")
+    )
+
+    return builder.as_markup(
+        resize_keyboard=True
+    )
 
 main_keyboard = ReplyKeyboardMarkup(
     keyboard= [
