@@ -1,12 +1,10 @@
 import sqlite3
-from pathlib import Path
-
-DB_PATH = Path(__file__).resolve().parent / "finance.db"
+from config import DB_PATH
 
 def get_connection() -> sqlite3.Connection:
     """Создает подключение к базе данных и возвращает его в виде объекта"""
 
-    connection = sqlite3.Connection(DB_PATH)
+    connection = sqlite3.connect(DB_PATH)
 
     # Позволяет получать значения столбцов по их названию
     connection.row_factory = sqlite3.Row
