@@ -64,12 +64,36 @@ async def create_transfer(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) <2:
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup= main_keyboard
+        )
+
+        return
+
+    accounts_map : dict[str,int] = {}
+
+    for account in accounts:
+        if account.product_name is not None:
+            button_text = f"{account.source}\n{account.product_name}"
+        else:
+            button_text = f"{account.source}"
+
+        accounts_map[button_text] = account.object_number
+
+    await state.clear()
+
+    await state.update_data(accounts_map= accounts_map)
 
     await state.set_state(CreateTransfer.source_account)
 
     await message.answer(
-        "Введите идентификатор счёта с которого совершается перевод",
-        reply_markup= fsm_navigation_keyboard
+        "Выберите счёт с которого совершается перевод",
+        reply_markup= accounts_select_keyboard(accounts)
     )
 
 @router.message(StateFilter(CreateTransfer), F.text == "❌ Отмена")
@@ -100,22 +124,110 @@ async def back_transfer(message : Message, state : FSMContext) -> None:
 
     if current_state == CreateTransfer.dest_account.state:
 
+        if message.from_user is None:
+            return
+
+        telegram_user_id = message.from_user.id
+
+        user = user_repository.get_user_by_telegram_id(telegram_user_id)
+
+        if user is None:
+
+            await state.clear()
+
+            await message.answer(
+                "Пользователь не найден",
+                reply_markup= main_keyboard
+            )
+
+            return
+
+        accounts = account_repository.get_active_accounts(user.user_id)
+
+        if len(accounts) <2:
+
+            await state.clear()
+
+            await message.answer(
+                "Для перевода необходимо минимум два активных счёта",
+                reply_markup= main_keyboard
+            )
+
+            return
+
+        accounts_map: dict[str, int] = {}
+
+        for account in accounts:
+
+            if account.product_name is not None:
+                button_text = f"{account.source}\n{account.product_name}"
+            else:
+                button_text = f"{account.source}"
+
+            accounts_map[button_text] = account.object_number
+
+        await state.update_data(accounts_map = accounts_map)
+
         await state.set_state(CreateTransfer.source_account)
 
         await message.answer(
-            "Введите идентификатор счёта с которого совершается перевод",
-            reply_markup= fsm_navigation_keyboard
+            "Выберите счёт с которого совершается перевод",
+            reply_markup= accounts_select_keyboard(accounts)
         )
 
         return
 
     if current_state == CreateTransfer.amount.state:
 
+        if message.from_user is None:
+            return
+
+        telegram_user_id = message.from_user.id
+
+        user = user_repository.get_user_by_telegram_id(telegram_user_id)
+
+        if user is None:
+
+            await state.clear()
+
+            await message.answer(
+                "Пользователь не найден",
+                reply_markup= main_keyboard
+            )
+
+            return
+
+        accounts = account_repository.get_active_accounts(user.user_id)
+
+        if len(accounts) <2:
+
+            await state.clear()
+
+            await message.answer(
+                "Для перевода необходимо минимум два активных счёта",
+                reply_markup= main_keyboard
+            )
+
+            return
+
+        accounts_map: dict[str, int] = {}
+
+        for account in accounts:
+
+            if account.product_name is not None:
+                button_text = f"{account.source}\n{account.product_name}"
+            else:
+                button_text = f"{account.source}"
+
+            accounts_map[button_text] = account.object_number
+
+        await state.update_data(accounts_map = accounts_map)
+
         await state.set_state(CreateTransfer.dest_account)
 
         await message.answer(
-            "Введите идентификатор счёта на который совершается перевод",
-            reply_markup= fsm_navigation_keyboard
+            "Выберите счёт на который совершается перевод",
+            reply_markup= accounts_select_keyboard(accounts)
         )
 
         return
@@ -146,36 +258,21 @@ async def back_transfer(message : Message, state : FSMContext) -> None:
 async def source_acc_handler(message : Message, state : FSMContext) -> None:
 
     if message.from_user is None:
-
         return
 
     if message.text is None:
-
-        await message.answer(
-            "Введите идентификатор счёта числом",
-            reply_markup= fsm_navigation_keyboard
-        )
-
         return
 
-    try:
+    data = await state.get_data()
 
-        account_id = int(message.text.strip())
+    accounts_map = data.get("accounts_map",{})
 
-    except ValueError:
+    account_id = accounts_map.get(message.text)
 
-        await message.answer(
-            "Идентификатор счёта должен быть целочисленным",
-            reply_markup= fsm_navigation_keyboard
-        )
-
-        return
-
-    if account_id <= 0 :
+    if account_id is None:
 
         await message.answer(
-            "Идентификатор счёта должен быть больше нуля",
-            reply_markup= fsm_navigation_keyboard
+            "Выберите счёт с помощью кнопки"
         )
 
         return
@@ -206,13 +303,46 @@ async def source_acc_handler(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) < 2:
+
+        await state.clear()
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup=main_keyboard
+        )
+
+        return
+
+    accounts_map: dict[str, int] = {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = (
+                f"{account.source}\n"
+                f"{account.product_name}"
+            )
+
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
+    await state.update_data(
+        accounts_map=accounts_map
+    )
+
     source_account = account_repository.get_account_by_id(account_id, user.user_id)
 
     if source_account is None:
 
         await message.answer(
-            "Указанный счёт отправителя не найден",
-            reply_markup= fsm_navigation_keyboard
+            "Указанный счёт отправителя не найден\n"
+            "Выберите другой счёт",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
@@ -220,8 +350,9 @@ async def source_acc_handler(message : Message, state : FSMContext) -> None:
     if not source_account.is_active:
 
         await message.answer(
-            "Указанный счёт отправителя деактивирован",
-            reply_markup= fsm_navigation_keyboard
+            "Указанный счёт отправителя деактивирован\n"
+            "Выберите другой счёт",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
@@ -231,8 +362,8 @@ async def source_acc_handler(message : Message, state : FSMContext) -> None:
     await state.set_state(CreateTransfer.dest_account)
 
     await message.answer(
-        "Введите идентификатор счёта на который совершается перевод",
-        reply_markup= fsm_navigation_keyboard
+        "Выберите счёт на который совершается перевод",
+        reply_markup= accounts_select_keyboard(accounts)
     )
 
 @router.message(CreateTransfer.dest_account)
@@ -243,46 +374,29 @@ async def dest_acc_handler(message : Message, state : FSMContext) -> None:
         return
 
     if message.text is None:
-
-        await message.answer(
-            "Введите идентификатор счёта числом",
-            reply_markup= fsm_navigation_keyboard
-        )
-
-        return
-
-    try:
-
-        dest_account_id = int(message.text.strip())
-
-    except ValueError:
-
-        await message.answer(
-            "Идентификатор счёта должен быть целочисленным",
-            reply_markup= fsm_navigation_keyboard
-        )
-
-        return
-
-    if dest_account_id <= 0 :
-
-        await message.answer(
-            "Идентификатор счёта должен быть больше нуля",
-            reply_markup= fsm_navigation_keyboard
-        )
-
         return
 
     data = await state.get_data()
+
+    accounts_map = data.get("accounts_map",{})
+
+    dest_account_id = accounts_map.get(message.text)
+
+    if dest_account_id is None:
+
+        await message.answer(
+            "Выберите счёт с помощью кнопки"
+        )
+
+        return
 
     source_account_id = data["source_account_id"]
 
     if dest_account_id == source_account_id:
 
         await message.answer(
-            "Идентификаторы счёта отправителя и счёта получателя должны быть разными\n\n"
-            "Измените идентификатор счёта получателя или вернитесь и измените идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт отправителя и счёт получателя должны быть разными\n\n"
+            "Выберите другой счёт получателя"
         )
 
         return
@@ -313,13 +427,48 @@ async def dest_acc_handler(message : Message, state : FSMContext) -> None:
 
         return
 
-    dest_account = account_repository.get_account_by_id(dest_account_id, user.user_id)
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) < 2:
+
+        await state.clear()
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup=main_keyboard
+        )
+
+        return
+
+    accounts_map: dict[str, int] = {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = (
+                f"{account.source}\n"
+                f"{account.product_name}"
+            )
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
+    await state.update_data(
+        accounts_map=accounts_map
+    )
+
+    dest_account = account_repository.get_account_by_id(
+        dest_account_id,
+        user.user_id
+    )
 
     if dest_account is None:
 
         await message.answer(
-            "Указанный счёт получателя не найден",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт получателя больше не найден.\n\n"
+            "Выберите другой счёт.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
@@ -327,53 +476,69 @@ async def dest_acc_handler(message : Message, state : FSMContext) -> None:
     if not dest_account.is_active:
 
         await message.answer(
-            "Указанный счёт получателя деактивирован",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт получателя деактивирован.\n\n"
+            "Выберите другой счёт.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
 
-    source_account = account_repository.get_account_by_id(source_account_id, user.user_id)
+    source_account = account_repository.get_account_by_id(
+        source_account_id,
+        user.user_id
+    )
 
     if source_account is None:
 
-        await state.set_state(CreateTransfer.source_account)
-    
-        await message.answer(
-            "Указанный счёт отправителя не найден\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.source_account
         )
-    
+
+        await message.answer(
+            "Счёт отправителя больше не найден.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
-    
+
     if not source_account.is_active:
 
-        await state.set_state(CreateTransfer.source_account)
-    
-        await message.answer(
-            "Указанный счёт отправителя деактивирован\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.source_account
         )
-    
+
+        await message.answer(
+            "Счёт отправителя деактивирован.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
 
     if dest_account.currency != source_account.currency:
 
         await message.answer(
-            "Валюта указанных счетов должна быть одинаковая",
-            reply_markup= fsm_navigation_keyboard
+            "Валюта счетов должна совпадать.\n\n"
+            f"Счёт отправителя: {source_account.currency}\n"
+            f"Счёт получателя: {dest_account.currency}\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
+
         return
 
-    await state.update_data(dest_account_id = dest_account_id)
+    await state.update_data(
+        dest_account_id=dest_account_id
+    )
 
-    await state.set_state(CreateTransfer.amount)
+    await state.set_state(
+        CreateTransfer.amount
+    )
 
     await message.answer(
         "Введите сумму перевода",
-        reply_markup= fsm_navigation_keyboard
+        reply_markup=fsm_navigation_keyboard
     )
 
 @router.message(CreateTransfer.amount)
@@ -451,30 +616,66 @@ async def amount_handler(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) < 2:
+
+        await state.clear()
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup=main_keyboard
+        )
+
+        return
+
+    accounts_map: dict[str, int] = {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = (
+                f"{account.source}\n"
+                f"{account.product_name}"
+            )
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
+    await state.update_data(accounts_map=accounts_map)
+
     source_account_id = data["source_account_id"]
 
-    source_account = account_repository.get_account_by_id(source_account_id, user.user_id)
+    source_account = account_repository.get_account_by_id(
+        source_account_id,
+        user.user_id
+    )
 
     if source_account is None:
 
-        await state.set_state(CreateTransfer.source_account)
+        await state.set_state(
+            CreateTransfer.source_account
+        )
 
         await message.answer(
-            "Указанный счёт отправителя не найден\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт отправителя больше не найден.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
 
     if not source_account.is_active:
 
-        await state.set_state(CreateTransfer.source_account)
+        await state.set_state(
+            CreateTransfer.source_account
+        )
 
         await message.answer(
-            "Указанный счёт отправителя деактивирован\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт отправителя деактивирован.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
@@ -484,19 +685,25 @@ async def amount_handler(message : Message, state : FSMContext) -> None:
         await message.answer(
             "На указанном счёте отправителя недостаточно средств\n\n"
             "Введите меньшую сумму перевода\n"
-            f"На счёте доступно: {source_account.balance} {source_account.currency}",
-            reply_markup= fsm_navigation_keyboard
+            f"На счёте доступно: "
+            f"{source_account.balance} "
+            f"{source_account.currency}",
+            reply_markup=fsm_navigation_keyboard
         )
 
         return
 
-    await state.update_data(amount = amount)
+    await state.update_data(
+        amount=amount
+    )
 
-    await state.set_state(CreateTransfer.comment)
+    await state.set_state(
+        CreateTransfer.comment
+    )
 
     await message.answer(
         "Введите комментарий к переводу",
-        reply_markup= fsm_navigation_keyboard
+        reply_markup=fsm_navigation_keyboard
     )
 
 @router.message(CreateTransfer.comment)
@@ -554,98 +761,155 @@ async def comment_handler(message : Message, state : FSMContext) -> None:
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) < 2:
+
+        await state.clear()
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup=main_keyboard
+        )
+
+        return
+
+    accounts_map: dict[str, int] = {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = (
+                f"{account.source}\n"
+                f"{account.product_name}"
+            )
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
+    await state.update_data(
+        accounts_map=accounts_map
+    )
+
     data = await state.get_data()
 
     source_account_id = data["source_account_id"]
 
-    source_account = account_repository.get_account_by_id(source_account_id, user.user_id)
+    source_account = account_repository.get_account_by_id(
+        source_account_id,
+        user.user_id
+    )
 
     if source_account is None:
 
-        await state.set_state(CreateTransfer.source_account)
+        await state.set_state(
+            CreateTransfer.source_account
+        )
 
         await message.answer(
-            "Указанный счёт отправителя не найден\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт отправителя больше не найден.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
 
     if not source_account.is_active:
 
-        await state.set_state(CreateTransfer.source_account)
-    
-        await message.answer(
-            "Указанный счёт отправителя деактивирован\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.source_account
         )
-    
+
+        await message.answer(
+            "Счёт отправителя деактивирован.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
 
     dest_account_id = data["dest_account_id"]
 
-    dest_account = account_repository.get_account_by_id(dest_account_id, user.user_id)
+    dest_account = account_repository.get_account_by_id(
+        dest_account_id,
+        user.user_id
+    )
 
     if dest_account is None:
 
-        await state.set_state(CreateTransfer.dest_account)
-    
-        await message.answer(
-            "Указанный счёт получателя не найден\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.dest_account
         )
-    
+
+        await message.answer(
+            "Счёт получателя больше не найден.\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
-    
+
     if not dest_account.is_active:
 
-        await state.set_state(CreateTransfer.dest_account)
-        
-        await message.answer(
-            "Указанный счёт получателя деактивирован\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.dest_account
         )
-        
+
+        await message.answer(
+            "Счёт получателя деактивирован.\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
 
     if dest_account.currency != source_account.currency:
 
-        await state.set_state(CreateTransfer.dest_account)
+        await state.set_state(
+            CreateTransfer.dest_account
+        )
 
         await message.answer(
-            "Валюта счетов должна совпадать\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+            "Валюта счетов должна совпадать.\n\n"
+            f"Счёт отправителя: {source_account.currency}\n"
+            f"Счёт получателя: {dest_account.currency}\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
 
         return
 
     if data["amount"] > source_account.balance:
 
-        await state.set_state(CreateTransfer.amount)
+        await state.set_state(
+            CreateTransfer.amount
+        )
 
         await message.answer(
             "На счёте отправителя недостаточно средств\n\n"
-            f"Доступно: {source_account.balance} {source_account.currency}\n"
-            f"Введите другую сумму перевода",
-            reply_markup= fsm_navigation_keyboard
+            f"Доступно: {source_account.balance} "
+            f"{source_account.currency}\n"
+            "Введите другую сумму перевода",
+            reply_markup=fsm_navigation_keyboard
         )
 
         return
-    
-    await state.set_state(CreateTransfer.confirm)
+
+    await state.set_state(
+        CreateTransfer.confirm
+    )
 
     await message.answer(
         "Проверьте данные операции\n\n"
-        f"Счёт отправителя: №{source_account.object_number} - {source_account.acc_type}\n"
-        f"Счёт получателя: №{dest_account.object_number} - {dest_account.acc_type}\n"
-        f"Сумма перевода: {data['amount']} {source_account.currency}\n"
+        f"Счёт отправителя: №{source_account.object_number} - "
+        f"{source_account.source}\n"
+        f"Счёт получателя: №{dest_account.object_number} - "
+        f"{dest_account.source}\n"
+        f"Сумма перевода: {data['amount']} "
+        f"{source_account.currency}\n"
         f"Комментарий: {data['comment']}",
-        reply_markup= transfer_confirm_keyboard
+        reply_markup=transfer_confirm_keyboard
     )
 
 @router.message(CreateTransfer.confirm, F.text == "✅ Подтвердить перевод")
@@ -681,83 +945,135 @@ async def confirm_transfer_handler(message : Message, state : FSMContext) -> Non
 
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if len(accounts) < 2:
+
+        await state.clear()
+
+        await message.answer(
+            "Для перевода необходимо минимум два активных счёта",
+            reply_markup=main_keyboard
+        )
+
+        return
+
+    accounts_map: dict[str, int] = {}
+
+    for account in accounts:
+
+        if account.product_name is not None:
+            button_text = (
+                f"{account.source}\n"
+                f"{account.product_name}"
+            )
+        else:
+            button_text = account.source
+
+        accounts_map[button_text] = account.object_number
+
+    await state.update_data(
+        accounts_map=accounts_map
+    )
+
     data = await state.get_data()
 
-    source_account = account_repository.get_account_by_id(data['source_account_id'], user.user_id)
+    source_account = account_repository.get_account_by_id(
+        data["source_account_id"],
+        user.user_id
+    )
 
     if source_account is None:
-    
-        await state.set_state(CreateTransfer.source_account)
-    
-        await message.answer(
-            "Указанный счёт отправителя не найден\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+
+        await state.set_state(
+            CreateTransfer.source_account
         )
-    
-        return
-    
-    if not source_account.is_active:
-    
-        await state.set_state(CreateTransfer.source_account)
-        
+
         await message.answer(
-            "Указанный счёт отправителя деактивирован\n\n"
-            "Введите другой идентификатор счёта отправителя",
-            reply_markup= fsm_navigation_keyboard
+            "Счёт отправителя больше не найден.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
         )
-        
+
         return
 
-    dest_account = account_repository.get_account_by_id(data['dest_account_id'], user.user_id)
+    if not source_account.is_active:
+
+        await state.set_state(
+            CreateTransfer.source_account
+        )
+
+        await message.answer(
+            "Счёт отправителя деактивирован.\n\n"
+            "Выберите другой счёт отправителя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
+        return
+
+    dest_account = account_repository.get_account_by_id(
+        data["dest_account_id"],
+        user.user_id
+    )
 
     if dest_account is None:
-    
-        await state.set_state(CreateTransfer.dest_account)
-        
-        await message.answer(
-            "Указанный счёт получателя не найден\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+
+        await state.set_state(
+            CreateTransfer.dest_account
         )
-        
+
+        await message.answer(
+            "Счёт получателя больше не найден.\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
-        
+
     if not dest_account.is_active:
-    
-        await state.set_state(CreateTransfer.dest_account)
-            
-        await message.answer(
-            "Указанный счёт получателя деактивирован\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+
+        await state.set_state(
+            CreateTransfer.dest_account
         )
-            
+
+        await message.answer(
+            "Счёт получателя деактивирован.\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
 
     if dest_account.currency != source_account.currency:
 
-        await state.set_state(CreateTransfer.dest_account)
-        
-        await message.answer(
-            "Валюта счетов должна совпадать\n\n"
-            "Введите другой идентификатор счёта получателя",
-            reply_markup= fsm_navigation_keyboard
+        await state.set_state(
+            CreateTransfer.dest_account
         )
-        
+
+        await message.answer(
+            "Валюта счетов должна совпадать.\n\n"
+            f"Счёт отправителя: {source_account.currency}\n"
+            f"Счёт получателя: {dest_account.currency}\n\n"
+            "Выберите другой счёт получателя.",
+            reply_markup=accounts_select_keyboard(accounts)
+        )
+
         return
 
     if data["amount"] > source_account.balance:
-    
-        await state.set_state(CreateTransfer.amount)
-    
+
+        await state.set_state(
+            CreateTransfer.amount
+        )
+
         await message.answer(
             "На счёте отправителя недостаточно средств\n\n"
-            f"Доступно: {source_account.balance} {source_account.currency}\n"
-            f"Введите другую сумму перевода",
-            reply_markup= fsm_navigation_keyboard
+            f"Доступно: {source_account.balance} "
+            f"{source_account.currency}\n"
+            "Введите другую сумму перевода",
+            reply_markup=fsm_navigation_keyboard
         )
-    
+
         return
     
     try:
@@ -792,11 +1108,11 @@ async def confirm_transfer_handler(message : Message, state : FSMContext) -> Non
 
     await message.answer(
     "Перевод успешно выполнен!\n\n"
-    f"Счёт отправителя: №{updated_source.object_number} - {updated_source.acc_type}\n"
-    f"Счёт получателя: №{updated_dest.object_number} - {updated_dest.acc_type}\n"
+    f"Счёт отправителя: №{updated_source.object_number} - {updated_source.source}\n"
+    f"Счёт получателя: №{updated_dest.object_number} - {updated_dest.source}\n"
     f"Сумма перевода: {transfer.amount} {updated_source.currency}\n\n"
-    f"Новый баланс счёта отправителя: {updated_source.balance} {updated_source.currency}\n"
-    f"Новый баланс счёта получателя: {updated_dest.balance} {updated_dest.currency}",
+    f"Баланс счёта отправителя: {updated_source.balance:,.2f} {updated_source.currency}\n"
+    f"Баланс счёта получателя: {updated_dest.balance:,.2f} {updated_dest.currency}".replace(","," "),
     reply_markup=main_keyboard
 )
     

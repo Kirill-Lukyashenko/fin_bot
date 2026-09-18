@@ -123,12 +123,19 @@ transfer_confirm_keyboard = ReplyKeyboardMarkup(
 statistics_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="Сумма на всех счетах"),
+            KeyboardButton(text="Доходы за сегодня"),
             KeyboardButton(text="Расходы за сегодня"),
         ],
         [
-            KeyboardButton(text="Расходы за текущую неделю"),
+            KeyboardButton(text="Доходы за текущую неделю"),
+            KeyboardButton(text="Расходы за текущую неделю")
+        ],
+        [
+            KeyboardButton(text="Доходы за текущий месяц"),
             KeyboardButton(text="Расходы за текущий месяц")
+        ],
+        [
+            KeyboardButton(text="Сумма на всех счетах")
         ],
         [
             KeyboardButton(text="Главное меню")
