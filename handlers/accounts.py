@@ -6,16 +6,15 @@ from aiogram.filters import StateFilter
 
 from decimal import Decimal, InvalidOperation
 
-from user_repository import UserRepository
-
 from account import Account
 from account_repository import AccountRepository
 
 from keyboards import accounts_keyboard, main_keyboard, fsm_navigation_keyboard, account_confirm_keyboard
 
+from utils.telegram_helper import get_active_user
+
 router = Router()
 
-user_repository = UserRepository()
 account_repository = AccountRepository()
 
 class CreateAccount(StatesGroup):
@@ -37,19 +36,9 @@ async def accounts_handler(message : Message, state : FSMContext) -> None:
 
     await state.clear()
 
-    if message.from_user is None:
-        return
-
-    telegram_user_id = message.from_user.id
-
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
+    user = await get_active_user(message, main_keyboard)
 
     if user is None:
-        await message.answer("Сначала выполните команду /start")
-        return
-
-    if not user.is_active:
-        await message.answer("Пользователь деактивирован!")
         return
 
     await message.answer(
@@ -62,19 +51,9 @@ async def get_accounts_handler(message : Message, state : FSMContext) -> None:
 
     await state.clear()
 
-    if message.from_user is None:
-        return
-    
-    telegram_user_id = message.from_user.id
-    
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
+    user = await get_active_user(message, accounts_keyboard)
     
     if user is None:
-        await message.answer("Сначала выполните команду /start")
-        return
-    
-    if not user.is_active:
-        await message.answer("Пользователь деактивирован!")
         return
 
     accounts = account_repository.get_active_accounts(user.user_id)
@@ -111,19 +90,9 @@ async def main_menu_handler(message : Message, state : FSMContext) -> None:
 
     await state.clear()
 
-    if message.from_user is None:
-        return
-    
-    telegram_user_id = message.from_user.id
-    
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
+    user = await get_active_user(message, main_keyboard)
     
     if user is None:
-        await message.answer("Сначала выполните команду /start")
-        return
-    
-    if not user.is_active:
-        await message.answer("Пользователь деактивирован!")
         return
     
     await message.answer(
@@ -134,19 +103,9 @@ async def main_menu_handler(message : Message, state : FSMContext) -> None:
 @router.message(F.text == "Создать счёт")
 async def create_account_handler(message : Message, state : FSMContext) -> None:
 
-    if message.from_user is None:
-        return
-        
-    telegram_user_id = message.from_user.id
-        
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
-        
+    user = await get_active_user(message, accounts_keyboard)
+    
     if user is None:
-        await message.answer("Сначала выполните команду /start")
-        return
-        
-    if not user.is_active:
-        await message.answer("Пользователь деактивирован!")
         return
 
     await state.clear()
@@ -267,21 +226,10 @@ async def back_create_account(message : Message, state : FSMContext) -> None:
 @router.message(F.text == "Получить счёт по идентификатору")
 async def get_account_by_id_handler(message : Message, state : FSMContext):
 
-    if message.from_user is None:
-        return
-            
-    telegram_user_id = message.from_user.id
-            
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
-            
+    user = await get_active_user(message, accounts_keyboard)
+    
     if user is None:
         await state.clear()
-        await message.answer("Сначала выполните команду /start")
-        return
-            
-    if not user.is_active:
-        await state.clear()
-        await message.answer("Пользователь деактивирован!")
         return
 
     await state.clear()
@@ -296,21 +244,10 @@ async def get_account_by_id_handler(message : Message, state : FSMContext):
 @router.message(GetAccount.get_by_id)
 async def get_account(message : Message, state : FSMContext):
 
-    if message.from_user is None:
-        return
-        
-    telegram_user_id = message.from_user.id
-        
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
-        
+    user = await get_active_user(message, accounts_keyboard)
+    
     if user is None:
         await state.clear()
-        await message.answer("Сначала выполните команду /start")
-        return
-        
-    if not user.is_active:
-        await state.clear()
-        await message.answer("Пользователь деактивирован!")
         return
 
     if message.text is None:
@@ -530,27 +467,10 @@ async def create_account_balance(message : Message, state : FSMContext) -> None:
 @router.message(CreateAccount.confirm, F.text == "✅ Создать счёт")
 async def confirm_create_account(message : Message, state : FSMContext) -> None:
 
-    if message.from_user is None:
-        return
-
-    telegram_user_id = message.from_user.id
-
-    user = user_repository.get_user_by_telegram_id(telegram_user_id)
-
+    user = await get_active_user(message, accounts_keyboard)
+    
     if user is None:
-
         await state.clear()
-
-        await message.answer("Пользователь не найден")
-
-        return
-
-    if not user.is_active:
-
-        await state.clear()
-
-        await message.answer("Пользователь деактивирован")
-
         return
 
     data = await state.get_data()
