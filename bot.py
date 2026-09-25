@@ -11,6 +11,7 @@ from handlers.accounts import router as accounts_router
 from handlers.transactions import router as transactions_router
 from handlers.transfers import router as transfers_router
 from handlers.statistics import router as statistics_router
+from handlers.settings import router as settings_router
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
@@ -25,6 +26,7 @@ async def main() -> None:
     dp.include_router(transactions_router)
     dp.include_router(transfers_router)
     dp.include_router(statistics_router)
+    dp.include_router(settings_router)
 
     await dp.start_polling(bot)
 

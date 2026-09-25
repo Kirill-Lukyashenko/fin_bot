@@ -167,3 +167,55 @@ async def total_income_by_day(message: Message, state: FSMContext) -> None:
 
     if user is None:
         return
+
+    transactions = transaction_repository.get_transactions_by_period(user.user_id, date.today(), date.today())
+
+    if not transactions:
+
+        await message.answer(
+            "Не найдено транзакций за сегодня",
+            reply_markup= statistics_keyboard
+        )
+
+        return
+
+    message_text = "Доходы за сегодня:\n\n"
+
+    income_found = False
+
+    totals: dict[str, Decimal] = {}
+
+    for transaction in transactions:
+
+        if transaction.operation == OperationType.INCOME:
+
+            income_found  = True
+
+            currency = transaction.account.currency
+
+            if currency not in totals:
+                totals[currency] = Decimal("0")
+
+            totals[currency] += transaction.amount
+
+            message_text += f"{transaction.category} - {transaction.amount:,.2f} {transaction.account.currency}\n".replace(","," ")
+
+    if not income_found:
+
+        await message.answer(
+            "За сегодня не найдено доходов",
+            reply_markup= statistics_keyboard
+        )
+
+        return 
+
+    message_text += "\nИтого:\n"
+
+    for currency, total in totals.items():
+
+        message_text += f"• {total:,.2f} {currency}\n".replace(","," ")
+
+    await message.answer(
+        message_text,
+        reply_markup= statistics_keyboard
+    )

@@ -43,7 +43,7 @@ main_keyboard = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text= "♻️ Перевод"),
-            KeyboardButton(text= "📖 История")
+            KeyboardButton(text= "📖 История🔞")
         ],
         [
             KeyboardButton(text= "📊 Статистика"),
@@ -120,6 +120,19 @@ transfer_confirm_keyboard = ReplyKeyboardMarkup(
     resize_keyboard= True
 )
 
+deactivate_confirm_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text= "✅ Подтвердить деактивацию")
+        ],
+        [
+            KeyboardButton(text= "⬅️ Назад"),
+            KeyboardButton(text= "❌ Отмена")
+        ],
+    ],
+    resize_keyboard= True
+)
+
 statistics_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -127,15 +140,30 @@ statistics_keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="Расходы за сегодня"),
         ],
         [
-            KeyboardButton(text="Доходы за текущую неделю"),
-            KeyboardButton(text="Расходы за текущую неделю")
+            KeyboardButton(text="Доходы за текущую неделю🔞"),
+            KeyboardButton(text="Расходы за текущую неделю🔞")
         ],
         [
-            KeyboardButton(text="Доходы за текущий месяц"),
-            KeyboardButton(text="Расходы за текущий месяц")
+            KeyboardButton(text="Доходы за текущий месяц🔞"),
+            KeyboardButton(text="Расходы за текущий месяц🔞")
         ],
         [
             KeyboardButton(text="Сумма на всех счетах")
+        ],
+        [
+            KeyboardButton(text="Главное меню")
+        ],
+    ],
+    resize_keyboard= True
+)
+
+settings_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Деактивировать счёт")
+        ],
+        [
+            KeyboardButton(text="Восстановить счёт🔞")
         ],
         [
             KeyboardButton(text="Главное меню")

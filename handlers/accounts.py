@@ -232,12 +232,36 @@ async def get_account_by_id_handler(message : Message, state : FSMContext):
         await state.clear()
         return
 
+    accounts = account_repository.get_active_accounts(user.user_id)
+
+    if not accounts:
+
+        await message.answer(
+            "У вас нет активных счетов",
+            reply_markup= accounts_keyboard
+        )
+
+        return
+
+    text = "Ваши активные счета:\n\n"
+
+    for account in accounts:
+
+        if account.product_name is not None:
+
+            text += f"ID: {account.object_number} - {account.product_name}\n"
+
+        else:
+
+            text += f"ID: {account.object_number} - {account.source}\n"
+
     await state.clear()
 
     await state.set_state(GetAccount.get_by_id)
 
     await message.answer(
-        "Введите идентификатор счёта",
+        f"{text}"
+        "\nВведите идентификатор счёта\n",
         reply_markup= fsm_navigation_keyboard
     )
 

@@ -33,7 +33,7 @@ async def start_handler(message : Message, state : FSMContext) -> None:
 
         await message.answer(
             "Добро пожаловать!\n"
-            "Новый пользователь зарегестрирован.",
+            "Новый пользователь зарегистрирован.",
             reply_markup= main_keyboard
         )
 
