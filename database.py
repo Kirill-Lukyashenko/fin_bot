@@ -32,6 +32,35 @@ def create_tables() -> None:
 
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS obligations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+
+                obligation_type TEXT NOT NULL CHECK (
+                obligation_type IN ('Долг', 'Займ')
+            ),
+
+                amount_minor INTEGER NOT NULL DEFAULT 0
+                CHECK (amount_minor >= 0),
+
+                currency TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+
+                is_active INTEGER NOT NULL DEFAULT 1
+                    CHECK (is_active IN (0, 1)),
+
+                comment TEXT NOT NULL,
+
+            FOREIGN KEY (user_id)
+            REFERENCES users(user_id)
+            ON DELETE RESTRICT
+            )
+            """
+        )
+
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
