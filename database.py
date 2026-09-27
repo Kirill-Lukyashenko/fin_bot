@@ -40,12 +40,12 @@ def create_tables() -> None:
                 obligation_type IN ('Долг', 'Займ')
             ),
 
-                amount_minor INTEGER NOT NULL DEFAULT 0
-                CHECK (amount_minor >= 0),
+                amount_minor INTEGER NOT NULL
+                CHECK (amount_minor > 0),
 
                 currency TEXT NOT NULL,
                 start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
+                end_date TEXT,
 
                 is_active INTEGER NOT NULL DEFAULT 1
                     CHECK (is_active IN (0, 1)),
@@ -147,5 +147,13 @@ def create_tables() -> None:
             CREATE INDEX IF NOT EXISTS
                 idx_transactions_action_date_id
             ON transactions(action_date,id)
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+                idx_obligations_user_id
+            ON obligations(user_id)
             """
         )
