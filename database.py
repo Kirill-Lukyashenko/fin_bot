@@ -36,12 +36,21 @@ def create_tables() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
 
+                counterparty TEXT NOT NULL,
+
                 obligation_type TEXT NOT NULL CHECK (
                 obligation_type IN ('Долг', 'Займ')
             ),
 
                 amount_minor INTEGER NOT NULL
                 CHECK (amount_minor > 0),
+
+                remaining_amount_minor INTEGER NOT NULL
+                CHECK (
+                    remaining_amount_minor >= 0
+                    AND
+                    remaining_amount_minor <= amount_minor
+                ),
 
                 currency TEXT NOT NULL,
                 start_date TEXT NOT NULL,

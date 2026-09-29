@@ -24,8 +24,10 @@ class Obligation:
     def __init__(self,
                  obligation_id : int | None,                                                        # Идентификатор обязательства
                  user_id : int,                                                                     # Идентификатор пользователя
+                 counterparty : str,                                                                # Контрагент
                  obligation_type : ObligationType,                                                  # Тип обязательства
-                 amount : str| Decimal,                                                             # Сумма
+                 amount : str| Decimal,                                                             # Первоначальная сумма обязательства
+                 remaining_amount : str | Decimal,                                                  # Оставшаяся часть обязательства
                  currency : CurrencyType,                                                           # Валюта
                  start_date : date,                                                                 # Дата выдачи обязательства
                  end_date : date | None,                                                            # Дата возврата обязательства
@@ -49,23 +51,49 @@ class Obligation:
         if user_id <= 0:
             raise ValueError("Идентификатор пользователя должен быть больше нуля")
 
+        # Валидация контрагента
+        if not isinstance(counterparty, str):
+            raise TypeError("Контрагент должен быть строкой")
+
+        counterparty = counterparty.strip()
+
+        if not counterparty:
+            raise ValueError("Контрагент не может быть пустым")
+
         # Валидация типа обязательства
         if not isinstance(obligation_type, ObligationType):
             raise TypeError("Неверный тип обязательства")
 
-        # Валидация суммы обязательства
+        # Валидация начальной суммы обязательства
         try:
             normalized_amount = str(amount).replace(" ", "").replace(",", ".")
             pure_amount = Decimal(normalized_amount)
 
         except (InvalidOperation, ValueError, TypeError):
-            raise ValueError("Неверно указана сумма")
+            raise ValueError("Неверно указана начальная сумма")
 
         if not pure_amount.is_finite():
-            raise ValueError("Сумма должна быть конечным числом")
+            raise ValueError("Начальная сумма должна быть конечным числом")
 
         if pure_amount <= 0:
-            raise ValueError("Сумма должна быть больше нуля")
+            raise ValueError("Начальная сумма должна быть больше нуля")
+
+        # Валидация оставшейся суммы обязательства
+        try:
+            normalized_remaining_amount = str(remaining_amount).replace(" ", "").replace(",",".")
+            pure_remaining_amount = Decimal(normalized_remaining_amount)
+
+        except (InvalidOperation, ValueError, TypeError):
+            raise ValueError("Неверно указана оставшаяся сумма")
+
+        if not pure_remaining_amount.is_finite():
+            raise ValueError("Оставшаяся сумма должна быть конечным числом")
+
+        if pure_remaining_amount < 0:
+            raise ValueError("Оставшаяся сумма не может быть меньше нуля")
+
+        if pure_remaining_amount > pure_amount:
+            raise ValueError("Оставшаяся сумма не может превышать первоначальную сумму")
 
         # Валидация валюты
         if not isinstance(currency, CurrencyType):
@@ -100,8 +128,10 @@ class Obligation:
         # Построение объекта
         self.obligation_id = obligation_id
         self.user_id = user_id
+        self.counterparty = counterparty
         self.obligation_type = obligation_type
         self.amount = pure_amount
+        self.remaining_amount = pure_remaining_amount
         self.currency = currency
         self.start_date = start_date
         self.end_date = end_date
