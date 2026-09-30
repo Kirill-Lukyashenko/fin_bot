@@ -1,5 +1,6 @@
 from account import Account
 from database import get_connection
+from decimal import Decimal
 from money import to_minor_units, from_minor_units
 
 class AccountRepository:
@@ -362,3 +363,12 @@ class AccountRepository:
 
         finally:
             connection.close()
+
+    def increase_balance_in_transaction(self, account_id : int, amount : Decimal | str, user_id : int, connection):
+        """Функция увеличивает баланс"""
+
+        if type(account_id) is not int:
+            raise TypeError("Идентификатор счёта должен быть целочисленным")
+
+        if account_id <= 0:
+            raise ValueError("Идентификатор счёта долже быть больше нуля")

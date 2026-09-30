@@ -6,26 +6,31 @@ from datetime import date
 class ObligationRepository:
     """Описание работы с таблицей obligations"""
 
-    def add_obligation(self, obligation : Obligation) -> int:
-        """Функция добавляет новое обязательство в базу"""
+    def add_obligation_in_transaction(self, obligation : Obligation, connection, user_id : int) -> int:
+        """Добавляет обязательство в рамках внешней транзакции"""
 
         if not isinstance(obligation, Obligation):
-            raise TypeError("Должен быть передан объект obligation")
+            raise TypeError("Обязательство должно быть объектом Obligation")
 
         if obligation.obligation_id is not None:
             raise ValueError("Данное обязательство уже имеет идентификатор")
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+
+        if obligation.user_id != user_id:
+            raise ValueError("Обязательство не принадлежит указанному пользователю")
 
         amount_minor = to_minor_units(obligation.amount)
 
         remaining_amount_minor = to_minor_units(obligation.remaining_amount)
 
-        connection = get_connection()
-
-        try:
-
-            cursor = connection.execute(
-                """
-                INSERT INTO obligations (
+        cursor = connection.execute(
+            """
+            INSERT INTO obligations(
                     user_id,
                     counterparty,
                     obligation_type,
@@ -36,32 +41,43 @@ class ObligationRepository:
                     end_date,
                     is_active,
                     comment
-                )
-                VALUES (?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    obligation.user_id,
-                    obligation.counterparty,
-                    obligation.obligation_type.value,
-                    amount_minor,
-                    remaining_amount_minor,
-                    obligation.currency.value,
-                    obligation.start_date.isoformat(),
-                    (
-                        obligation.end_date.isoformat()
-                        if obligation.end_date is not None
-                        else None
-                    ),
-                    int(obligation.is_active),
-                    obligation.comment,
-                )
             )
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                obligation.user_id,
+                obligation.counterparty,
+                obligation.obligation_type.value,
+                amount_minor,
+                remaining_amount_minor,
+                obligation.currency.value,
+                obligation.start_date.isoformat(),
+                (
+                    obligation.end_date.isoformat()
+                    if obligation.end_date is not None
+                    else None
+                ),
+                int(obligation.is_active),
+                obligation.comment,
+            )
+        )
+
+        obligation.obligation_id = cursor.lastrowid
+        
+        return obligation.obligation_id
+
+    def add_obligation(self, obligation : Obligation, user_id : int) -> int:
+        """Функция добавляет новое обязательство в базу"""
+
+        connection = get_connection()
+
+        try:
+
+            obligation_id = self.add_obligation_in_transaction(obligation, connection, user_id)
 
             connection.commit()
 
-            obligation.obligation_id = cursor.lastrowid
-
-            return obligation.obligation_id
+            return obligation_id
 
         except Exception:
             connection.rollback()
@@ -333,3 +349,7 @@ class ObligationRepository:
         finally:
 
             connection.close()
+
+
+
+        

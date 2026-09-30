@@ -25,5 +25,3 @@ class ObligationService:
             raise ValueError("Обязательство не принадлежит указанному пользователю")
 
         return self.obligation_repository.add_obligation(obligation)
-
-        
