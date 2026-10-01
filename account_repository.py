@@ -364,11 +364,96 @@ class AccountRepository:
         finally:
             connection.close()
 
-    def increase_balance_in_transaction(self, account_id : int, amount : Decimal | str, user_id : int, connection):
+    def increase_balance_in_transaction(self, account_id : int, amount : Decimal | str, user_id : int, connection) -> None:
         """Функция увеличивает баланс"""
 
         if type(account_id) is not int:
             raise TypeError("Идентификатор счёта должен быть целочисленным")
 
         if account_id <= 0:
-            raise ValueError("Идентификатор счёта долже быть больше нуля")
+            raise ValueError("Идентификатор счёта должен быть больше нуля")
+
+        if not isinstance(amount, (Decimal, str)):
+            raise TypeError("Передаваемая сумма должна быть объектом Decimal или str")
+
+        amount_minor = to_minor_units(amount)
+
+        if amount_minor <= 0:
+            raise ValueError("Сумма должна быть больше нуля")
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <=0 :
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+        
+        cursor = connection.execute(
+            """
+            UPDATE accounts
+            SET
+                balance_minor = balance_minor + ?
+            WHERE
+                id = ?
+            AND
+                user_id = ?
+            AND
+                is_active = 1
+            """,
+            (
+                amount_minor,
+                account_id,
+                user_id,
+            )
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError("Счёт не найден или недоступен")
+
+    def decrease_balance_in_transaction(self, account_id : int, amount : Decimal | str, user_id : int, connection) -> None:
+        """Функция уменьшает баланс"""
+
+        if type(account_id) is not int:
+            raise TypeError("Идентификатор счёта должен быть целочисленным")
+
+        if account_id <= 0:
+            raise ValueError("Идентификатор счёта должен быть больше нуля")
+
+        if not isinstance(amount, (Decimal, str)):
+            raise TypeError("Передаваемая сумма должна быть объектом Decimal или str")
+
+        amount_minor = to_minor_units(amount)
+
+        if amount_minor <= 0:
+            raise ValueError("Сумма должна быть больше нуля")
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <=0 :
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+        
+        cursor = connection.execute(
+            """
+            UPDATE accounts
+            SET
+                balance_minor = balance_minor - ?
+            WHERE
+                id = ?
+            AND
+                user_id = ?
+            AND
+                is_active = 1
+            AND
+                balance_minor >= ?
+            """,
+            (
+                amount_minor,
+                account_id,
+                user_id,
+                amount_minor,
+            )
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError("Счёт не найден, недоступен или на нём недостаточно средств")
+        

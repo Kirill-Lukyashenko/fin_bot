@@ -3,6 +3,7 @@ from database import get_connection
 from money import from_minor_units, to_minor_units
 from datetime import date
 
+
 class ObligationRepository:
     """Описание работы с таблицей obligations"""
 
@@ -349,7 +350,3 @@ class ObligationRepository:
         finally:
 
             connection.close()
-
-
-
-        

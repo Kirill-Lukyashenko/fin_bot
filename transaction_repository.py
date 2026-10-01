@@ -7,8 +7,8 @@ from datetime import date
 class TransactionRepository:
     """Описание работы с таблицей transactions"""
 
-    def add_transaction(self, transaction : Transaction, user_id : int) -> int:
-        """Функция добавляет в таблицу transactions новую транзакцию"""
+    def add_transaction_in_transaction(self, transaction : Transaction, user_id : int, connection) -> int:
+        """Добавляет транзакцию в рамках внешней транзакции"""
 
         if type(user_id) is not int:
             raise TypeError("Передаваемый идентификатор пользователя должен быть целочисленным")
@@ -30,58 +30,65 @@ class TransactionRepository:
         if transaction.account.user_id != user_id:
             raise ValueError("Счёт транзакции не принадлежит пользователю")
 
+        cursor = connection.execute(
+            """
+            INSERT INTO transactions (
+                action_date,
+                amount_minor,
+                operation,
+                category,
+                account_id,
+                comment,
+                transfer_id,
+                is_active
+            )
+            SELECT 
+                ?,
+                ?,
+                ?,
+                ?,
+                a.id,
+                ?,
+                ?,
+                ?
+            FROM accounts AS a
+        
+            WHERE a.id = ?
+            AND a.user_id = ?
+                        
+            """,
+            (
+                transaction.action_date.isoformat(),
+                amount_minor,
+                transaction.operation.value,
+                transaction.category,
+                transaction.comment,
+                transaction.transfer_id,
+                int(transaction.is_active),
+                transaction.account.object_number,
+                user_id,
+            )
+        )
+        
+        if cursor.rowcount == 0:
+            raise ValueError("Счёт не найден или не принадлежит пользователю")
+
+        transaction.transaction_id = cursor.lastrowid
+
+        return transaction.transaction_id
+
+    def add_transaction(self, transaction : Transaction, user_id : int) -> int:
+        """Функция добавляет в таблицу transactions новую транзакцию"""
+
         connection = get_connection()
 
         try:
 
-            cursor = connection.execute(
-                """
-                INSERT INTO transactions (
-                    action_date,
-                    amount_minor,
-                    operation,
-                    category,
-                    account_id,
-                    comment,
-                    transfer_id,
-                    is_active
-                )
-                SELECT 
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    a.id,
-                    ?,
-                    ?,
-                    ?
-                FROM accounts AS a
-
-                WHERE a.id = ?
-                AND a.user_id = ?
-                
-                """,
-                (
-                    transaction.action_date.isoformat(),
-                    amount_minor,
-                    transaction.operation.value,
-                    transaction.category,
-                    transaction.comment,
-                    transaction.transfer_id,
-                    int(transaction.is_active),
-                    transaction.account.object_number,
-                    user_id,
-                )
-            )
-
-            if cursor.rowcount == 0:
-                raise ValueError("Счёт не найден или не принадлежит пользователю")
-
+            transaction_id = self.add_transaction_in_transaction(transaction, user_id, connection)
+  
             connection.commit()
 
-            transaction.transaction_id = cursor.lastrowid
-
-            return transaction.transaction_id
+            return transaction_id
 
         except Exception:
             connection.rollback()
