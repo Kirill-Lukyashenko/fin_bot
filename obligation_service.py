@@ -8,6 +8,13 @@ from account import Account
 
 from database import get_connection
 
+from decimal import Decimal
+from datetime import date
+
+from money import to_minor_units, from_minor_units
+
+from utils.validation import validate_id
+
 class ObligationService:
 
     def __init__(self, obligation_repository : ObligationRepository, transaction_repository : TransactionRepository, account_repository : AccountRepository):
@@ -24,11 +31,7 @@ class ObligationService:
         if obligation.obligation_id is not None:
             raise ValueError("Обязательство уже имеет идентификатор")
 
-        if type(user_id) is not int:
-            raise TypeError("Идентификатор пользователя должен быть целочисленным")
-
-        if user_id <= 0:
-            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+        validate_id(user_id= user_id)
 
         if obligation.user_id != user_id:
             raise ValueError("Обязательство не принадлежит указанному пользователю")
@@ -50,11 +53,7 @@ class ObligationService:
         if account.object_number is None:
             raise ValueError("Счёт сначала должен быть сохранён в базе")
 
-        if type(user_id) is not int:
-            raise TypeError("Идентификатор пользователя должен быть целочисленным")
-
-        if user_id <= 0:
-            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+        validate_id(user_id= user_id)
 
         if obligation.user_id != user_id:
             raise ValueError("Обязательство не принадлежит указанному пользователю")
@@ -132,3 +131,32 @@ class ObligationService:
         finally:
             connection.close()
         
+    def repay_obligation(self, obligation_id : int, account : Account, repayment_amount : Decimal | str, repayment_date : date, user_id : int) -> None:
+        """Функция выполняет частичное или полное погашение обязательства"""
+
+        validate_id(obligation_id= obligation_id, user_id= user_id)
+
+        if not isinstance(account, Account):
+            raise TypeError("Счёт должен быть объектом Account")
+
+        if account.object_number is None:
+            raise ValueError("Счёт должен быть сохранен в базе")
+
+        if not isinstance(repayment_amount, (Decimal,str)):
+            raise TypeError("Неккоректная сумма")
+
+        repayment_amount_minor = to_minor_units(repayment_amount)
+
+        pure_amount = from_minor_units(repayment_amount_minor)
+
+        if repayment_amount_minor <= 0:
+            raise ValueError("Сумма должна быть больше нуля")
+
+        if not isinstance(repayment_date, date):
+            raise TypeError("Дата погашения должна быть объектом date")
+
+        if account.user_id != user_id:
+            raise ValueError("Счёт не принадлежит указанному пользователю")
+
+        if not account.is_active:
+            raise ValueError("Счёт не может быть деактивированным")

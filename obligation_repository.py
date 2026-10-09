@@ -2,6 +2,8 @@ from obligation import Obligation, ObligationType, CurrencyType
 from database import get_connection
 from money import from_minor_units, to_minor_units
 from datetime import date
+from decimal import Decimal
+from utils.validation import validate_id
 
 
 class ObligationRepository:
@@ -67,6 +69,60 @@ class ObligationRepository:
         
         return obligation.obligation_id
 
+    def decrease_remaining_amount_in_transaction(self, obligation_id : int, amount : Decimal, user_id : int, connection) -> None:
+        """Фунция уменьшает сумму оставшегося обязательства"""
+
+        if type(obligation_id) is not int:
+            raise TypeError("Идентификатор обязательства должен быть целочисленным")
+
+        if obligation_id <=0 :
+            raise ValueError("Идентификатор обязательства должен быть больше нуля")
+
+        if  not isinstance(amount, Decimal):
+            raise TypeError("Неккоректный тип суммы")
+
+        if type(user_id) is not int:
+            raise TypeError("Идентификатор пользователя должен быть целочисленным")
+
+        if user_id <= 0:
+            raise ValueError("Идентификатор пользователя должен быть больше нуля")
+
+        amount_minor= to_minor_units(amount)
+
+        if amount_minor <= 0:
+            raise ValueError("Сумма погашения должна быть больше нуля")
+
+        cursor = connection.execute(
+            """
+            UPDATE obligations
+            SET
+                remaining_amount_minor = remaining_amount_minor - ?,
+                is_active = CASE
+                    WHEN remaining_amount_minor - ? = 0 THEN 0
+                    ELSE 1
+                END
+            WHERE
+                id = ?
+            AND
+                user_id = ?
+            AND
+                is_active = 1
+            AND
+                remaining_amount_minor >= ?
+            """,
+            (
+                amount_minor,
+                amount_minor,
+                obligation_id,
+                user_id,
+                amount_minor,
+            )
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError("Обязательство не найдено, закрыто или сумма погашения превышает остаток")
+           
+
     def add_obligation(self, obligation : Obligation, user_id : int) -> int:
         """Функция добавляет новое обязательство в базу"""
 
@@ -82,6 +138,7 @@ class ObligationRepository:
 
         except Exception:
             connection.rollback()
+            obligation.obligation_id = None
             raise
 
         finally:
@@ -90,51 +147,45 @@ class ObligationRepository:
     def get_obligation_by_id(self, obligation_id : int, user_id : int) -> Obligation | None:
         """Функция восстанваливает объект Obligation из БД по идентификатору"""
 
-        if type(obligation_id) is not int:
-            raise TypeError("Идентификатор обязательства должен быть целочисленным")
-
-        if obligation_id <=0:
-            raise ValueError("Идентификатор обязательства должен быть больше нуля")
-
-        if type(user_id) is not int:
-            raise TypeError("Идентификатор пользователя должен быть целочисленным")
-
-        if user_id <=0:
-            raise ValueError("Идентификатор пользователя должен быть больше нуля")
-
         connection = get_connection()
 
         try:
 
-            row = connection.execute(
-                """
-                SELECT
-                    id,
-                    user_id,
-                    counterparty,
-                    obligation_type,
-                    amount_minor,
-                    remaining_amount_minor,
-                    currency,
-                    start_date,
-                    end_date,
-                    comment,
-                    is_active
-                FROM obligations
-                WHERE
-                    id = ?
-                AND
-                    user_id = ?
-                """,
-                (
-                    obligation_id,
-                    user_id,
-                )
-            ).fetchone()
+            return self.get_obligation_by_id_in_transaction(obligation_id= obligation_id, user_id= user_id, connection= connection)
 
         finally:
 
             connection.close()
+
+    def get_obligation_by_id_in_transaction(self, obligation_id : int, user_id : int, connection) -> Obligation | None:
+
+        validate_id(obligation_id= obligation_id, user_id= user_id)
+
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                counterparty,
+                obligation_type,
+                amount_minor,
+                remaining_amount_minor,
+                currency,
+                start_date,
+                end_date,
+                comment,
+                is_active
+            FROM obligations
+            WHERE
+                id = ?
+            AND
+                user_id = ?
+            """,
+            (
+                obligation_id,
+                user_id,
+            )
+        ).fetchone()
 
         if row is None:
             return None
@@ -243,10 +294,6 @@ class ObligationRepository:
         if obligation.user_id != user_id:
             raise ValueError("Обязательство не принадлежит указанному пользователю")
 
-        amount_minor = to_minor_units(obligation.amount)
-
-        remaining_amount_minor = to_minor_units(obligation.remaining_amount)
-
         connection = get_connection()
 
         try:
@@ -256,33 +303,23 @@ class ObligationRepository:
                 UPDATE obligations
                 SET
                     counterparty = ?,
-                    obligation_type = ?,
-                    amount_minor = ?,
-                    remaining_amount_minor = ?,
-                    currency = ?,
-                    start_date = ?,
                     end_date = ?,
-                    comment = ?,
-                    is_active = ?
+                    comment = ?
                 WHERE
                     id = ?
                 AND
                     user_id = ?
+                AND
+                    is_active = 1
                 """,
                 (
                     obligation.counterparty,
-                    obligation.obligation_type.value,
-                    amount_minor,
-                    remaining_amount_minor,
-                    obligation.currency.value,
-                    obligation.start_date.isoformat(),
                     (
                         obligation.end_date.isoformat()
                         if obligation.end_date is not None
                         else None
                     ),
                     obligation.comment,
-                    int(obligation.is_active),
                     obligation.obligation_id,
                     user_id
                 )

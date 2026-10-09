@@ -456,4 +456,4 @@ class AccountRepository:
 
         if cursor.rowcount == 0:
             raise ValueError("Счёт не найден, недоступен или на нём недостаточно средств")
-        
+
