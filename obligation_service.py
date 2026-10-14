@@ -13,7 +13,7 @@ from datetime import date
 
 from money import to_minor_units, from_minor_units
 
-from utils.validation import validate_id
+from utils.validation import validate_id, validate_amount
 
 class ObligationService:
 
@@ -134,6 +134,9 @@ class ObligationService:
     def repay_obligation(self, obligation_id : int, account : Account, repayment_amount : Decimal | str, repayment_date : date, user_id : int) -> None:
         """Функция выполняет частичное или полное погашение обязательства"""
 
+        if obligation_id is None or user_id is None:
+            raise ValueError("Идентификаторы обязательства и пользователя обязательны")
+
         validate_id(obligation_id= obligation_id, user_id= user_id)
 
         if not isinstance(account, Account):
@@ -142,15 +145,9 @@ class ObligationService:
         if account.object_number is None:
             raise ValueError("Счёт должен быть сохранен в базе")
 
-        if not isinstance(repayment_amount, (Decimal,str)):
-            raise TypeError("Неккоректная сумма")
+        validate_id(account_id=account.object_number)
 
-        repayment_amount_minor = to_minor_units(repayment_amount)
-
-        pure_amount = from_minor_units(repayment_amount_minor)
-
-        if repayment_amount_minor <= 0:
-            raise ValueError("Сумма должна быть больше нуля")
+        pure_amount = validate_amount(repayment_amount)
 
         if not isinstance(repayment_date, date):
             raise TypeError("Дата погашения должна быть объектом date")
