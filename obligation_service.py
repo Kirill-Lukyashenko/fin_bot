@@ -157,3 +157,42 @@ class ObligationService:
 
         if not account.is_active:
             raise ValueError("Счёт не может быть деактивированным")
+
+        connection = get_connection()
+
+        try:
+
+            connection.execute(
+                """
+                BEGIN IMMEDIATE
+                """
+            )
+
+            obligation = self.obligation_repository.get_obligation_by_id_in_transaction(obligation_id= obligation_id, user_id= user_id, connection= connection)
+
+            if obligation is None:
+                raise ValueError("Обязательство не найдено")
+
+            if not obligation.is_active:
+                raise ValueError("Обязательство уже закрыто")
+
+            if obligation.currency.value != account.currency:
+                raise ValueError("Валюта счёта должна совпадать с валютой обязательства")
+
+            if pure_amount > obligation.remaining_amount:
+                raise ValueError("Сумма погашения превышает остаток обязательства")
+
+            if repayment_date < obligation.start_date:
+                raise ValueError("Дата погашения не может быть раньше даты возникновения обязательства")
+
+            connection.commit()
+
+        except Exception:
+
+            connection.rollback()
+            raise
+
+        finally:
+
+            connection.close()
+        
