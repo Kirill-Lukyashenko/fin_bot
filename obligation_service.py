@@ -196,3 +196,7 @@ class ObligationService:
 
             connection.close()
         
+
+        if obligation.obligation_type == ObligationType.DEBT:
+
+            transaction = Transaction()
